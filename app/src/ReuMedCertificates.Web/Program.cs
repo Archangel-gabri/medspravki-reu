@@ -21,10 +21,20 @@ builder.Host.UseSerilog((context, services, configuration) =>
 
 builder.Services.AddRazorPages(options =>
 {
-    // Всё под авторизацией; страница входа и ошибки — анонимны.
-    options.Conventions.AuthorizeFolder("/");
+    // Все страницы — только для сотрудников с ролью (не «любой вошедший»); вход/ошибка — анонимны.
+    options.Conventions.AuthorizeFolder("/", "StaffOnly");
     options.Conventions.AllowAnonymousToPage("/Auth/Login");
     options.Conventions.AllowAnonymousToPage("/Error");
+    // Журнал аудита и импорт реестра — только администратор/завкафедрой.
+    options.Conventions.AuthorizePage("/Journal/Index", "AdminOrHead");
+    options.Conventions.AuthorizePage("/Import/Index", "AdminOrHead");
+});
+
+// Ролевые политики (разграничение доступа — устранение плоской авторизации, P1 MED-A01).
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("StaffOnly", p => p.RequireRole("Teacher", "HeadOfDepartment", "Admin"));
+    options.AddPolicy("AdminOrHead", p => p.RequireRole("HeadOfDepartment", "Admin"));
 });
 
 builder.Services.AddInfrastructure(builder.Configuration);
