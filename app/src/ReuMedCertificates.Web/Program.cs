@@ -29,13 +29,16 @@ builder.Services.AddRazorPages(options =>
     // Журнал аудита и импорт реестра — только администратор/завкафедрой.
     options.Conventions.AuthorizePage("/Journal/Index", "AdminOrHead");
     options.Conventions.AuthorizePage("/Import/Index", "AdminOrHead");
+    // Подтверждение справки — медицинский вердикт, только медработник/админ (323-ФЗ ст.13), не физрук.
+    options.Conventions.AuthorizePage("/Review/Index", "MedicalVerdict");
 });
 
 // Ролевые политики (разграничение доступа — устранение плоской авторизации, P1 MED-A01).
 builder.Services.AddAuthorization(options =>
 {
-    options.AddPolicy("StaffOnly", p => p.RequireRole("Teacher", "HeadOfDepartment", "Admin"));
+    options.AddPolicy("StaffOnly", p => p.RequireRole("Teacher", "HeadOfDepartment", "Admin", "MedicalStaff"));
     options.AddPolicy("AdminOrHead", p => p.RequireRole("HeadOfDepartment", "Admin"));
+    options.AddPolicy("MedicalVerdict", p => p.RequireRole("MedicalStaff", "Admin"));
 });
 
 builder.Services.AddInfrastructure(builder.Configuration);

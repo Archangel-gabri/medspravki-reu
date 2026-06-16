@@ -56,6 +56,20 @@ public static class DataSeeder
 
         if (configuration.GetValue<bool>("SeedDemoData"))
         {
+            // Демо-медработник: единственный (кроме админа), кто подтверждает справки (323-ФЗ).
+            var userMgr = sp.GetRequiredService<UserManager<AppUser>>();
+            if (await userMgr.FindByNameAsync("medic") is null)
+            {
+                var medicNow = DateTime.UtcNow;
+                var medic = new AppUser
+                {
+                    UserName = "medic", Email = "medic@rea.ru", EmailConfirmed = true,
+                    FullName = "Медработник (демо)", IsActive = true, CreatedAt = medicNow, UpdatedAt = medicNow
+                };
+                if ((await userMgr.CreateAsync(medic, "<демо-пароль>")).Succeeded)
+                    await userMgr.AddToRoleAsync(medic, AppRoles.MedicalStaff);
+            }
+
             await SeedDemoDataAsync(db);
             await SeedReviewQueueDemoAsync(db);
             await SeedAuditDemoAsync(db);
