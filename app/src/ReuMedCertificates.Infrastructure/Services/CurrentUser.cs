@@ -19,4 +19,6 @@ public sealed class CurrentUser : ICurrentUser
     public string UserName => Principal?.Identity?.Name ?? "system";
 
     public bool IsAuthenticated => Principal?.Identity?.IsAuthenticated ?? false;
+
+    public string? IpAddress => _accessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
 }

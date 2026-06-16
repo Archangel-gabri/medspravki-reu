@@ -54,6 +54,8 @@ public class IndexModel : PageModel
             ErrorMessage = $"Файл больше {MaxUploadMb} МБ.";
         else if (!_scanOptions.AllowedContentTypes.Contains(file.ContentType))
             ErrorMessage = $"Недопустимый тип файла ({file.ContentType}). Разрешено: PDF, JPG, PNG.";
+        else if (!await HasAllowedSignatureAsync(file, cancellationToken))
+            ErrorMessage = "Файл не прошёл проверку сигнатуры — это не PDF/JPG/PNG.";
         else
         {
             await using var stream = file.OpenReadStream();
@@ -101,6 +103,18 @@ public class IndexModel : PageModel
 
         Scans = rows;
         return true;
+    }
+
+    // Проверка реальной сигнатуры (magic bytes), а не клиентского MIME — анти-XSS на загрузке.
+    private static async Task<bool> HasAllowedSignatureAsync(IFormFile file, CancellationToken ct)
+    {
+        var buf = new byte[8];
+        await using var s = file.OpenReadStream();
+        var n = await s.ReadAsync(buf.AsMemory(0, 8), ct);
+        bool pdf = n >= 4 && buf[0] == 0x25 && buf[1] == 0x50 && buf[2] == 0x44 && buf[3] == 0x46; // %PDF
+        bool png = n >= 8 && buf[0] == 0x89 && buf[1] == 0x50 && buf[2] == 0x4E && buf[3] == 0x47; // PNG
+        bool jpg = n >= 3 && buf[0] == 0xFF && buf[1] == 0xD8 && buf[2] == 0xFF;                    // JPEG
+        return pdf || png || jpg;
     }
 
     private static IReadOnlyList<RecognizedField> ParseFields(string? json)

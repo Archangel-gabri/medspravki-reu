@@ -25,6 +25,7 @@ public static class AuditEntryFactory
             OccurredAt = clock.UtcNow,
             Description = description,
             BeforeJson = beforeJson,
-            AfterJson = afterJson
+            AfterJson = afterJson,
+            IpAddress = user.IpAddress
         };
 }

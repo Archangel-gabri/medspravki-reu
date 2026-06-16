@@ -6,4 +6,7 @@ public interface ICurrentUser
     Guid? UserId { get; }
     string UserName { get; }
     bool IsAuthenticated { get; }
+
+    /// <summary>IP-адрес запроса (для журнала безопасности / РСБ). null вне HTTP-контекста.</summary>
+    string? IpAddress { get; }
 }
