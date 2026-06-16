@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
 using ReuMedCertificates.Application.Abstractions;
@@ -38,6 +39,11 @@ builder.Services.AddAuthorization(options =>
 });
 
 builder.Services.AddInfrastructure(builder.Configuration);
+
+// Шифрование спецкатегории ПДн at-rest (P1 MED-A02): ключи персистентны, чтобы расшифровывать после рестарта.
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(AppContext.BaseDirectory, "App_Data", "dpkeys")))
+    .SetApplicationName("ReuMedCertificates");
 
 // Лимит размера загружаемого файла (скана справки) — чуть выше прикладного предела.
 var maxUpload = builder.Configuration.GetValue<long?>("Scans:MaxUploadBytes") ?? (10L * 1024 * 1024);
