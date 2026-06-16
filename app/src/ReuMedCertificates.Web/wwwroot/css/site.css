@@ -31,7 +31,8 @@ body {
 a { color: var(--navy); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
-.container { width: 100%; max-width: 1600px; margin: 0 auto; padding: 0 clamp(14px, 2vw, 32px); }
+/* Геометрия как у портала РЭУ: узкий центрированный контейнер Bootstrap-3 (1170px), gutter 20px. */
+.container { width: 100%; max-width: 1170px; margin: 0 auto; padding: 0 20px; }
 
 /* ---------- Верхняя чёрная плашка ---------- */
 .top-black-menu { background: var(--topbar); color: #fff; font-size: 13px; }
@@ -54,7 +55,7 @@ a:hover { text-decoration: underline; }
 
 /* ---------- Синий навбар / хлебные крошки ---------- */
 .bluemenu { background: var(--navy); color: #fff; }
-.bluemenu .container { display: flex; align-items: center; min-height: 40px; }
+.bluemenu .container { display: flex; align-items: center; min-height: 50px; }
 .crumbs { list-style: none; margin: 0; padding: 0; display: flex; gap: 8px; align-items: center; font-size: 13px; }
 .crumbs li { display: flex; gap: 8px; align-items: center; }
 .crumbs li + li::before { content: "›"; color: rgba(255,255,255,.6); }
