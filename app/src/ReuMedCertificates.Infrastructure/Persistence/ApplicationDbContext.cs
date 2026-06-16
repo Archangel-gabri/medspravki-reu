@@ -108,7 +108,7 @@ public class ApplicationDbContext
             e.Property(x => x.Sha256).HasMaxLength(64);
             e.Property(x => x.RecognitionStatus).HasMaxLength(20);
             e.Property(x => x.RecognitionModel).HasMaxLength(100);
-            e.Property(x => x.RecognitionJson).HasColumnType("jsonb");
+            e.Property(x => x.RecognitionJson).HasColumnType("text"); // text, т.к. хранится шифртекст (P1 MED-A02)
             e.HasOne(x => x.Student).WithMany()
                 .HasForeignKey(x => x.StudentId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.Certificate).WithMany()

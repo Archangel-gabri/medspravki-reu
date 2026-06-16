@@ -63,6 +63,7 @@ public static class DependencyInjection
             ?? new ScanStorageOptions();
         services.AddSingleton(scanOptions);
         services.AddScoped<IScanStorage, FileScanStorage>();
+        services.AddSingleton<IFieldProtector, DataProtectionFieldProtector>();
         services.AddScoped<IScanService, ScanService>();
 
         // Выбор провайдера распознавания по конфигу. План §3:

@@ -274,6 +274,10 @@ public static class DataSeeder
             CREATE TRIGGER trg_audit_logs_no_modify
                 BEFORE UPDATE OR DELETE ON audit_logs
                 FOR EACH ROW EXECUTE FUNCTION audit_logs_no_modify();");
+
+        // RecognitionJson хранит шифртекст (P1 MED-A02) — тип колонки text, а не jsonb. Идемпотентно.
+        await db.Database.ExecuteSqlRawAsync(
+            @"ALTER TABLE certificate_scans ALTER COLUMN ""RecognitionJson"" TYPE text USING ""RecognitionJson""::text;");
     }
 
     // Реальные подразделения кафедры (с фото-справочника «Расписание»).

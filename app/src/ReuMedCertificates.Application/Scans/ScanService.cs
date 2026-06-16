@@ -35,16 +35,18 @@ public sealed class ScanService : IScanService
     private readonly IDocumentRecognitionService _recognition;
     private readonly ICurrentUser _user;
     private readonly IDateTimeProvider _clock;
+    private readonly IFieldProtector _protector;
 
     public ScanService(
         IApplicationDbContext db, IScanStorage storage, IDocumentRecognitionService recognition,
-        ICurrentUser user, IDateTimeProvider clock)
+        ICurrentUser user, IDateTimeProvider clock, IFieldProtector protector)
     {
         _db = db;
         _storage = storage;
         _recognition = recognition;
         _user = user;
         _clock = clock;
+        _protector = protector;
     }
 
     public async Task<Guid> UploadAsync(ScanUploadRequest request, CancellationToken cancellationToken = default)
@@ -93,12 +95,15 @@ public sealed class ScanService : IScanService
         return new ScanContent(stream, scan.ContentType, scan.OriginalFileName);
     }
 
-    public async Task<ScanDetail?> GetAsync(Guid scanId, CancellationToken cancellationToken = default) =>
-        await _db.Scans.AsNoTracking()
+    public async Task<ScanDetail?> GetAsync(Guid scanId, CancellationToken cancellationToken = default)
+    {
+        var d = await _db.Scans.AsNoTracking()
             .Where(s => s.Id == scanId)
             .Select(s => new ScanDetail(s.Id, s.StudentId, s.OriginalFileName, s.SizeBytes, s.CreatedAt,
                 s.RecognitionStatus, s.RecognitionModel, s.RecognitionJson))
             .FirstOrDefaultAsync(cancellationToken);
+        return d?.RecognitionJson is { } json ? d with { RecognitionJson = _protector.Unprotect(json) } : d;
+    }
 
     public async Task<RecognitionResult?> RecognizeAsync(Guid scanId, CancellationToken cancellationToken = default)
     {
@@ -126,7 +131,8 @@ public sealed class ScanService : IScanService
             var result = await _recognition.RecognizeAsync(
                 new ScanInput(bytes, scan.ContentType, scan.OriginalFileName), cancellationToken);
 
-            scan.RecognitionJson = JsonSerializer.Serialize(result);
+            // Шифруем извлечённые поля at-rest (спецкатегория ПДн, P1 MED-A02).
+            scan.RecognitionJson = _protector.Protect(JsonSerializer.Serialize(result));
             scan.RecognitionStatus = result.RequiresManualReview && result.Fields.Count == 0 ? "Skipped" : "Done";
             scan.RecognizedAt = _clock.UtcNow;
             scan.UpdatedAt = _clock.UtcNow;
@@ -141,7 +147,7 @@ public sealed class ScanService : IScanService
         catch (Exception ex)
         {
             scan.RecognitionStatus = "Failed";
-            scan.RecognitionJson = JsonSerializer.Serialize(new { error = ex.Message });
+            scan.RecognitionJson = _protector.Protect(JsonSerializer.Serialize(new { error = ex.Message }));
             scan.UpdatedAt = _clock.UtcNow;
             await _db.SaveChangesAsync(cancellationToken);
             return null;
