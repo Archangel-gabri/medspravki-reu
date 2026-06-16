@@ -18,6 +18,7 @@ public static class DataSeeder
         var db = sp.GetRequiredService<ApplicationDbContext>();
 
         await db.Database.MigrateAsync();
+        await EnsureAuditAppendOnlyAsync(db);
 
         var roleManager = sp.GetRequiredService<RoleManager<AppRole>>();
         foreach (var role in AppRoles.All)
@@ -256,6 +257,23 @@ public static class DataSeeder
         }
 
         await db.SaveChangesAsync();
+    }
+
+    /// <summary>P1 (РСБ-целостность): делает audit_logs append-only на уровне БД — блокирует UPDATE/DELETE
+    /// триггером (срабатывает даже для суперпользователя). Идемпотентно.</summary>
+    private static async Task EnsureAuditAppendOnlyAsync(ApplicationDbContext db)
+    {
+        await db.Database.ExecuteSqlRawAsync(@"
+            CREATE OR REPLACE FUNCTION audit_logs_no_modify() RETURNS trigger AS $func$
+            BEGIN
+                RAISE EXCEPTION 'audit_logs — журнал только для добавления (INSERT-only)';
+            END;
+            $func$ LANGUAGE plpgsql;
+
+            DROP TRIGGER IF EXISTS trg_audit_logs_no_modify ON audit_logs;
+            CREATE TRIGGER trg_audit_logs_no_modify
+                BEFORE UPDATE OR DELETE ON audit_logs
+                FOR EACH ROW EXECUTE FUNCTION audit_logs_no_modify();");
     }
 
     // Реальные подразделения кафедры (с фото-справочника «Расписание»).
