@@ -12,7 +12,10 @@
     </div>
     <div class="head-actions">
         <a class="btn" href="/registry">← К реестру</a>
-        <a class="btn" href="/students/@s.Id/scans">Сканы и ИИ</a>
+        @if (User.IsInRole("MedicalStaff"))
+        {
+            <a class="btn" href="/students/@s.Id/scans">Сканы и ИИ</a>
+        }
         <a class="btn btn-primary" href="/students/@s.Id/certificates/new">+ Добавить справку</a>
     </div>
 </div>
@@ -46,7 +49,10 @@
                     <dl class="kv" style="margin-top:10px">
                         <dt>Срок действия</dt><dd>@c.StartDate.ToString("dd.MM.yyyy") – @c.EndDate.ToString("dd.MM.yyyy")</dd>
                         <dt>Физ. группа</dt><dd>@StatusDisplay.PhysicalGroup(c.PhysicalGroup)</dd>
-                        <dt>Группа здоровья</dt><dd>@StatusDisplay.HealthGroup(c.HealthGroup)</dd>
+                        @if (User.IsInRole("MedicalStaff"))
+                        {
+                            <dt>Группа здоровья</dt><dd>@StatusDisplay.HealthGroup(c.HealthGroup)</dd>
+                        }
                         <dt>Ограничения</dt><dd>@(string.IsNullOrWhiteSpace(c.Restrictions) ? "—" : c.Restrictions)</dd>
                         <dt>Справка №</dt><dd>@(c.CertificateNumber ?? "—")</dd>
                         <dt>Мед. организация</dt><dd>@(c.MedicalOrganization ?? "—")</dd>

@@ -27,18 +27,23 @@ builder.Services.AddRazorPages(options =>
     options.Conventions.AllowAnonymousToPage("/Auth/Login");
     options.Conventions.AllowAnonymousToPage("/Error");
     // Журнал аудита и импорт реестра — только администратор/завкафедрой.
+    // Журнал аудита и импорт реестра — администрация (завкафедрой/админ), не физрук/медработник.
     options.Conventions.AuthorizePage("/Journal/Index", "AdminOrHead");
     options.Conventions.AuthorizePage("/Import/Index", "AdminOrHead");
-    // Подтверждение справки — медицинский вердикт, только медработник/админ (323-ФЗ ст.13), не физрук.
-    options.Conventions.AuthorizePage("/Review/Index", "MedicalVerdict");
+    // Медданные (сканы, распознавание, подтверждение справки) — ТОЛЬКО медработник (152-ФЗ минимизация, 323-ФЗ).
+    options.Conventions.AuthorizePage("/Review/Index", "Medical");
+    options.Conventions.AuthorizeFolder("/Scans", "Medical");
 });
 
-// Ролевые политики (разграничение доступа — устранение плоской авторизации, P1 MED-A01).
+// Ролевые политики — логичное разграничение по ролям (минимизация прав).
 builder.Services.AddAuthorization(options =>
 {
+    // Базовый доступ (реестр, «Перед парой», карточки) — любой сотрудник.
     options.AddPolicy("StaffOnly", p => p.RequireRole("Teacher", "HeadOfDepartment", "Admin", "MedicalStaff"));
+    // Администрирование (журнал, импорт) — завкафедрой/админ.
     options.AddPolicy("AdminOrHead", p => p.RequireRole("HeadOfDepartment", "Admin"));
-    options.AddPolicy("MedicalVerdict", p => p.RequireRole("MedicalStaff", "Admin"));
+    // Медицинские данные/вердикт — только медработник (не админ — минимизация).
+    options.AddPolicy("Medical", p => p.RequireRole("MedicalStaff"));
 });
 
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -112,7 +117,7 @@ app.MapGet("/scans/{id:guid}/file", async (
     http.Response.Headers["Cache-Control"] = "no-store";
     http.Response.Headers["Content-Disposition"] = "inline";
     return Results.File(content.Stream, content.ContentType, enableRangeProcessing: true);
-}).RequireAuthorization(policy => policy.RequireRole("Teacher", "HeadOfDepartment", "Admin"));
+}).RequireAuthorization(policy => policy.RequireRole("MedicalStaff"));
 
 app.MapRazorPages();
 

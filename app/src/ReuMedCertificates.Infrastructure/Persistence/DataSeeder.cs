@@ -56,19 +56,12 @@ public static class DataSeeder
 
         if (configuration.GetValue<bool>("SeedDemoData"))
         {
-            // Демо-медработник: единственный (кроме админа), кто подтверждает справки (323-ФЗ).
+            // Демо-пользователи СТРОГО по одной роли (логичное разграничение прав).
             var userMgr = sp.GetRequiredService<UserManager<AppUser>>();
-            if (await userMgr.FindByNameAsync("medic") is null)
-            {
-                var medicNow = DateTime.UtcNow;
-                var medic = new AppUser
-                {
-                    UserName = "medic", Email = "medic@rea.ru", EmailConfirmed = true,
-                    FullName = "Медработник (демо)", IsActive = true, CreatedAt = medicNow, UpdatedAt = medicNow
-                };
-                if ((await userMgr.CreateAsync(medic, "<демо-пароль>")).Succeeded)
-                    await userMgr.AddToRoleAsync(medic, AppRoles.MedicalStaff);
-            }
+            await EnsureDemoUserAsync(userMgr, "teacher", "Преподаватель (демо)", AppRoles.Teacher);
+            await EnsureDemoUserAsync(userMgr, "medic", "Медработник (демо)", AppRoles.MedicalStaff);
+            await EnsureDemoUserAsync(userMgr, "head", "Зав. кафедрой (демо)", AppRoles.HeadOfDepartment);
+            await EnsureDemoUserAsync(userMgr, "admin", "Администратор (демо)", AppRoles.Admin);
 
             await SeedDemoDataAsync(db);
             await SeedReviewQueueDemoAsync(db);
@@ -292,6 +285,26 @@ public static class DataSeeder
         // RecognitionJson хранит шифртекст (P1 MED-A02) — тип колонки text, а не jsonb. Идемпотентно.
         await db.Database.ExecuteSqlRawAsync(
             @"ALTER TABLE certificate_scans ALTER COLUMN ""RecognitionJson"" TYPE text USING ""RecognitionJson""::text;");
+    }
+
+    /// <summary>Создаёт демо-пользователя (если нет) и приводит его роли РОВНО к одной нужной (минимизация прав).</summary>
+    private static async Task EnsureDemoUserAsync(UserManager<AppUser> um, string login, string fullName, string role)
+    {
+        var user = await um.FindByNameAsync(login);
+        if (user is null)
+        {
+            var now = DateTime.UtcNow;
+            user = new AppUser
+            {
+                UserName = login, Email = $"{login}@rea.ru", EmailConfirmed = true,
+                FullName = fullName, IsActive = true, CreatedAt = now, UpdatedAt = now
+            };
+            if (!(await um.CreateAsync(user, "<демо-пароль>")).Succeeded) return;
+        }
+        var current = await um.GetRolesAsync(user);
+        var extra = current.Where(r => r != role).ToList();
+        if (extra.Count > 0) await um.RemoveFromRolesAsync(user, extra);
+        if (!current.Contains(role)) await um.AddToRoleAsync(user, role);
     }
 
     // Реальные подразделения кафедры (с фото-справочника «Расписание»).
