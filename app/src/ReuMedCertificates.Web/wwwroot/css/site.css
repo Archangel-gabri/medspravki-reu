@@ -31,7 +31,7 @@ body {
 a { color: var(--navy); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
-.container { max-width: 1440px; margin: 0 auto; padding: 0 18px; }
+.container { width: 100%; max-width: 1600px; margin: 0 auto; padding: 0 clamp(14px, 2vw, 32px); }
 
 /* ---------- Верхняя чёрная плашка ---------- */
 .top-black-menu { background: var(--topbar); color: #fff; font-size: 13px; }
@@ -41,7 +41,7 @@ a:hover { text-decoration: underline; }
 
 /* ---------- Шапка с логотипом ---------- */
 .es-header { background: #fff; border-bottom: 1px solid var(--line); }
-.es-header .container { display: flex; align-items: center; gap: 18px; padding: 16px 15px; }
+.es-header .container { display: flex; align-items: center; gap: 18px; padding-top: 16px; padding-bottom: 16px; }
 .es-logo { display: flex; align-items: center; }
 .es-logo img { height: 46px; width: auto; display: block; }
 .es-logo-sub { border-left: 1px solid var(--line); padding-left: 18px; line-height: 1.25; }
@@ -109,8 +109,8 @@ a:hover { text-decoration: underline; }
 .input-grow { min-width: 240px; }
 
 /* ---------- Таблица реестра ---------- */
-.table-wrap { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
-table.grid { width: 100%; border-collapse: collapse; }
+.table-wrap { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow-x: auto; }
+table.grid { width: 100%; border-collapse: collapse; min-width: 720px; }
 table.grid thead th {
     text-align: left; font-size: 11.5px; text-transform: uppercase; letter-spacing: .4px;
     color: var(--navy-deep); font-weight: 700; padding: 10px 12px;
@@ -163,7 +163,7 @@ textarea.input { min-height: 70px; resize: vertical; width: 100%; }
 
 /* ---------- Футер ---------- */
 .es-footer { background: var(--footer); color: #cdd3da; font-size: 12.5px; flex-shrink: 0; }
-.es-footer .container { padding: 14px 15px; }
+.es-footer .container { padding-top: 14px; padding-bottom: 14px; }
 .es-footer a { color: #fff; }
 
 /* ---------- Экран входа ---------- */
@@ -177,11 +177,9 @@ textarea.input { min-height: 70px; resize: vertical; width: 100%; }
 .auth-card .input { width: 100%; }
 .check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted-ink); margin-bottom: 14px; }
 
-/* ---------- Адаптив (планшет / телефон) ---------- */
-@media (max-width: 760px) {
-    .container { padding: 0 12px; }
-    .top-black-menu .container { height: auto; padding: 6px 12px; font-size: 12px; flex-wrap: wrap; gap: 2px 12px; }
-    .es-header .container { flex-wrap: wrap; gap: 10px 14px; padding: 12px; }
+/* ---------- Адаптив: планшеты и узкие десктопы (стек сайдбара) ---------- */
+@media (max-width: 960px) {
+    .es-header .container { flex-wrap: wrap; gap: 10px 14px; }
     .es-logo-sub { display: none; }
     .es-user { margin-left: auto; }
     .shell { flex-direction: column; gap: 12px; min-height: 0; }
@@ -189,11 +187,17 @@ textarea.input { min-height: 70px; resize: vertical; width: 100%; }
     .sidemenu ul { display: flex; flex-wrap: wrap; }
     .sidemenu li { border-bottom: none; }
     .sidemenu li.active a { box-shadow: inset 0 -3px 0 var(--navy); }
-    .content { padding: 8px 0 24px; width: 100%; max-width: 100%; min-width: 0; }
+    .content { width: 100%; max-width: 100%; min-width: 0; padding: 10px 0 28px; }
     .page-head { flex-direction: column; align-items: flex-start; gap: 10px; }
+}
+
+/* ---------- Адаптив: телефоны ---------- */
+@media (max-width: 560px) {
+    .top-black-menu .container { height: auto; padding: 6px 0; font-size: 12px; flex-wrap: wrap; gap: 2px 12px; }
     .filters { flex-direction: column; align-items: stretch; }
     .field { width: 100%; }
     .input, select.input, .input-grow { min-width: 0; width: 100%; }
-    .table-wrap { overflow-x: auto; max-width: 100%; }
-    table.grid { min-width: 640px; }
+    .page-head h1 { font-size: 19px; }
+    .es-logo img { height: 38px; }
+    table.grid { min-width: 560px; }
 }
