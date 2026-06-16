@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Preview Registry</title>
+    <link rel="stylesheet" href="../src/ReuMedCertificates.Web/wwwroot/css/site.css" />
+</head>
+<body>
+    <div class="shell">
+        <aside class="sidebar">
+            <div class="brand">
+                <span class="brand-mark">РЭУ</span>
+                <div>
+                    <strong>Медсправки</strong>
+                    <span>Кафедра физкультуры</span>
+                </div>
+            </div>
+
+            <nav class="menu">
+                <a href="./registry.html">Реестр</a>
+                <a href="#">Студенты</a>
+                <a href="#">Справки</a>
+                <a href="#">Импорт Excel</a>
+                <a href="#">Журнал изменений</a>
+            </nav>
+        </aside>
+
+        <main class="content">
+            <header class="topbar">
+                <div class="topbar-user">teacher</div>
+                <a class="button" href="./login.html">Выйти</a>
+            </header>
+
+            <section class="page-header">
+                <div>
+                    <h1>Реестр справок</h1>
+                    <p>Быстрый поиск студентов и просмотр сроков действия медицинских справок.</p>
+                </div>
+            </section>
+
+            <form class="filters">
+                <input class="input" value="Иванов" />
+                <input class="input input-small" value="2" />
+                <button type="button" class="button button-primary">Найти</button>
+            </form>
+
+            <div class="table-shell">
+                <table class="registry-table">
+                    <thead>
+                        <tr>
+                            <th>ФИО</th>
+                            <th>Подразделение</th>
+                            <th>Курс</th>
+                            <th>Группа</th>
+                            <th>Преподаватель</th>
+                            <th>Справка</th>
+                            <th>Ограничения</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Иванов Иван Сергеевич</td>
+                            <td>Высшая школа права</td>
+                            <td>2</td>
+                            <td>15.27Д-Ю01/24Б</td>
+                            <td>Преподаватель 57</td>
+                            <td>15.04.2026 - 12.05.2026 <span class="badge">Active</span></td>
+                            <td>Освобождение от бега, только ЛФК</td>
+                        </tr>
+                        <tr>
+                            <td>Иванова Алина Романовна</td>
+                            <td>Высшая школа финансов</td>
+                            <td>2</td>
+                            <td>15.27Д-Ф01/24Б</td>
+                            <td>Преподаватель 65</td>
+                            <td>20.04.2026 - 30.04.2026 <span class="badge">ExpiringSoon</span></td>
+                            <td>Освобождение от силовых упражнений</td>
+                        </tr>
+                        <tr>
+                            <td>Иванов Никита Павлович</td>
+                            <td>Высшая школа менеджмента</td>
+                            <td>1</td>
+                            <td>15.27Д-М01/25Б</td>
+                            <td>Преподаватель 40</td>
+                            <td>01.03.2026 - 20.03.2026 <span class="badge">Expired</span></td>
+                            <td>-</td>
+                        </tr>
+                        <tr>
+                            <td>Иванченко Мария Дмитриевна</td>
+                            <td>Высшая школа экономики и бизнеса</td>
+                            <td>2</td>
+                            <td>15.27Д-Э02/24Б</td>
+                            <td>Преподаватель 45</td>
+                            <td>10.05.2026 - 28.05.2026 <span class="badge">Upcoming</span></td>
+                            <td>Щадящий режим, без прыжков</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

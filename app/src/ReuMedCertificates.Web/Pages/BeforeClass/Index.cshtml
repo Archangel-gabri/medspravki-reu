@@ -1,0 +1,73 @@
+@page "/before-class"
+@model ReuMedCertificates.Web.Pages.BeforeClass.IndexModel
+@{
+    ViewData["Title"] = "Перед парой";
+}
+
+<div class="page-head">
+    <div>
+        <h1>Перед парой</h1>
+        <p>Список группы со статусом допуска. Студенты без действующей справки — сверху и красным.</p>
+    </div>
+    <form method="get" class="head-actions">
+        <select class="input" name="group" onchange="this.form.submit()">
+            <option value="">— выберите группу —</option>
+            @foreach (var g in Model.Groups)
+            {
+                <option value="@g.Id" selected="@(Model.StudyGroupId == g.Id)">@g.Name (@g.Course курс)</option>
+            }
+        </select>
+    </form>
+</div>
+
+@if (Model.StudyGroupId is null)
+{
+    <div class="card empty">Выберите учебную группу, чтобы увидеть список студентов и их допуски.</div>
+}
+else if (Model.Rows.Count == 0)
+{
+    <div class="card empty">В группе «@Model.GroupName» пока нет студентов.</div>
+}
+else
+{
+    @if (Model.CountNoClearance > 0)
+    {
+        <div class="alert alert-warn">⚠ Без действующей справки / требуют внимания: <strong>@Model.CountNoClearance</strong></div>
+    }
+    <div class="table-wrap">
+        <table class="grid">
+            <thead>
+                <tr>
+                    <th>Студент</th>
+                    <th>Статус</th>
+                    <th>Физ. группа</th>
+                    <th>Ограничения</th>
+                    <th>Срок</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var r in Model.Rows)
+            {
+                var cls = StatusDisplay.CertClass(r.Status);
+                <tr class="row-status @cls">
+                    <td class="name-cell"><a href="/students/@r.StudentId">@r.FullName</a></td>
+                    <td>
+                        @if (r.Status is null && r.HasPendingReview)
+                        {
+                            <span class="badge muted"><span class="dot"></span>На проверке</span>
+                        }
+                        else
+                        {
+                            <span class="badge @cls"><span class="dot"></span>@StatusDisplay.CertText(r.Status)</span>
+                        }
+                    </td>
+                    <td>@StatusDisplay.PhysicalGroup(r.PhysicalGroup)</td>
+                    <td class="dim">@(string.IsNullOrWhiteSpace(r.Restrictions) ? "—" : r.Restrictions)</td>
+                    <td class="dim">@(r.EndDate is null ? "—" : r.EndDate.Value.ToString("dd.MM.yyyy"))</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+    <p class="note">Связь с оценкой — только подсказка преподавателю; система не выставляет оценки и не подтверждает подлинность справки.</p>
+}

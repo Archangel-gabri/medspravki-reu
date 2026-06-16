@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Preview Login</title>
+    <link rel="stylesheet" href="../src/ReuMedCertificates.Web/wwwroot/css/site.css" />
+</head>
+<body>
+    <div class="shell">
+        <aside class="sidebar">
+            <div class="brand">
+                <span class="brand-mark">РЭУ</span>
+                <div>
+                    <strong>Медсправки</strong>
+                    <span>Кафедра физкультуры</span>
+                </div>
+            </div>
+
+            <nav class="menu">
+                <a href="./registry.html">Реестр</a>
+                <a href="#">Студенты</a>
+                <a href="#">Справки</a>
+                <a href="#">Импорт Excel</a>
+                <a href="#">Журнал изменений</a>
+            </nav>
+        </aside>
+
+        <main class="content">
+            <div class="topbar">
+                <div class="topbar-user">Preview режима интерфейса</div>
+            </div>
+
+            <section class="auth-shell">
+                <div class="auth-card">
+                    <h1>Вход в систему</h1>
+                    <p>Реестр медицинских справок кафедры физической культуры РЭУ</p>
+
+                    <form>
+                        <label>Логин</label>
+                        <input class="input" value="teacher" />
+
+                        <label>Пароль</label>
+                        <input class="input" type="password" value="<демо-пароль>" />
+
+                        <label class="checkbox">
+                            <input type="checkbox" checked />
+                            <span>Запомнить меня</span>
+                        </label>
+
+                        <button type="button" class="button button-primary">Войти</button>
+                    </form>
+                </div>
+            </section>
+        </main>
+    </div>
+</body>
+</html>

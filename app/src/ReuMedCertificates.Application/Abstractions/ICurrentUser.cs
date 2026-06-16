@@ -1,0 +1,9 @@
+namespace ReuMedCertificates.Application.Abstractions;
+
+/// <summary>Текущий аутентифицированный пользователь (для аудита и проставления авторства).</summary>
+public interface ICurrentUser
+{
+    Guid? UserId { get; }
+    string UserName { get; }
+    bool IsAuthenticated { get; }
+}

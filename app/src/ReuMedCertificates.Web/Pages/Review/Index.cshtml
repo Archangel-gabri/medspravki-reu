@@ -1,0 +1,71 @@
+@page "/review"
+@using ReuMedCertificates.Web.Helpers
+@using ReuMedCertificates.Domain.Enums
+@model ReuMedCertificates.Web.Pages.Review.IndexModel
+@{
+    ViewData["Title"] = "На проверке";
+}
+
+<div class="page-head">
+    <div>
+        <h1>На проверке</h1>
+        <p>Справки, ожидающие подтверждения. Допуск студента вступает в силу только после подтверждения уполномоченным лицом.</p>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div class="alert alert-error">@Model.ErrorMessage</div>
+}
+
+<div class="table-wrap">
+    <table class="grid">
+        <thead>
+            <tr>
+                <th>ФИО</th>
+                <th>Группа</th>
+                <th>Преподаватель</th>
+                <th>Физ. группа</th>
+                <th>Срок справки</th>
+                <th>Источник</th>
+                <th>Решение</th>
+            </tr>
+        </thead>
+        <tbody>
+        @if (Model.Items.Count == 0)
+        {
+            <tr><td colspan="7" class="empty">Очередь пуста — все справки проверены.</td></tr>
+        }
+        @foreach (var it in Model.Items)
+        {
+            <tr>
+                <td class="name-cell"><a href="/students/@it.StudentId">@it.StudentName</a></td>
+                <td>@it.Group</td>
+                <td class="dim">@(it.Teacher ?? "—")</td>
+                <td>@StatusDisplay.PhysicalGroup(it.PhysicalGroup)</td>
+                <td class="dim">@it.StartDate.ToString("dd.MM.yyyy") – @it.EndDate.ToString("dd.MM.yyyy")</td>
+                <td><span class="pill">@SourceText(it.Source)</span></td>
+                <td>
+                    <form method="post" style="display:flex; gap:6px; align-items:center; margin:0;">
+                        <input type="hidden" name="id" value="@it.CertificateId" />
+                        <input class="input" name="reason" placeholder="Причина отклонения" style="min-width:160px" />
+                        <button class="btn btn-primary btn-sm" asp-page-handler="Approve">Подтвердить</button>
+                        <button class="btn btn-sm" asp-page-handler="Reject">Отклонить</button>
+                    </form>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>
+
+@functions {
+    static string SourceText(DraftSource s) => s switch
+    {
+        DraftSource.Manual => "Ручной ввод",
+        DraftSource.ExcelImport => "Импорт",
+        DraftSource.StudentUpload => "Загрузка студентом",
+        DraftSource.Ocr => "ИИ-распознавание",
+        _ => "—"
+    };
+}

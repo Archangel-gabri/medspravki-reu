@@ -1,0 +1,79 @@
+@page "/journal"
+@model ReuMedCertificates.Web.Pages.Journal.IndexModel
+@{
+    ViewData["Title"] = "Журнал";
+}
+
+<div class="page-head">
+    <div>
+        <h1>Журнал действий</h1>
+        <p>Бизнес-аудит системы: кто, когда и что сделал. Записи только добавляются (INSERT-only) — изменение и удаление запрещены.</p>
+    </div>
+</div>
+
+<form class="filters" method="get">
+    <div class="field">
+        <label>Тип действия</label>
+        <select class="input" name="action" onchange="this.form.submit()">
+            <option value="">Все</option>
+            @foreach (var a in new[] { "Create", "Approve", "Reject", "Update", "Import", "Login" })
+            {
+                <option value="@a" selected="@(Model.Action == a)">@ActionText(a)</option>
+            }
+        </select>
+    </div>
+</form>
+
+<div class="table-wrap">
+    <table class="grid">
+        <thead>
+            <tr>
+                <th>Дата и время</th>
+                <th>Пользователь</th>
+                <th>Действие</th>
+                <th>Объект</th>
+                <th>Описание</th>
+            </tr>
+        </thead>
+        <tbody>
+        @if (Model.Items.Count == 0)
+        {
+            <tr><td colspan="5" class="empty">Записей нет.</td></tr>
+        }
+        @foreach (var e in Model.Items)
+        {
+            <tr>
+                <td class="dim">@e.OccurredAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")</td>
+                <td>@(string.IsNullOrEmpty(e.UserName) ? "—" : e.UserName)</td>
+                <td><span class="pill">@ActionText(e.ActionType)</span></td>
+                <td class="dim">@EntityText(e.EntityType)</td>
+                <td>@e.Description</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>
+
+@functions {
+    static string ActionText(string a) => a switch
+    {
+        "Create" => "Создание",
+        "Approve" => "Подтверждение",
+        "Reject" => "Отклонение",
+        "Update" => "Изменение",
+        "SoftDelete" => "Удаление",
+        "Import" => "Импорт",
+        "Login" => "Вход",
+        "LoginFailed" => "Ошибка входа",
+        "Export" => "Экспорт",
+        _ => a
+    };
+
+    static string EntityText(string e) => e switch
+    {
+        "MedicalCertificate" => "Справка",
+        "Student" => "Студент",
+        "ImportBatch" => "Импорт",
+        _ => e
+    };
+}

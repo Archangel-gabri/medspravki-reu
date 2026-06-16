@@ -1,0 +1,82 @@
+@page "/students/{id:guid}/scans"
+@model ReuMedCertificates.Web.Pages.Scans.IndexModel
+@{
+    ViewData["Title"] = "Сканы справки";
+}
+
+<div class="page-head">
+    <div>
+        <h1>Сканы и распознавание</h1>
+        <p>Студент: <strong>@Model.StudentName</strong></p>
+    </div>
+    <div class="head-actions"><a class="btn" href="/students/@Model.StudentId">← К карточке</a></div>
+</div>
+
+@if (!string.IsNullOrEmpty(Model.Message)) { <div class="alert alert-warn">@Model.Message</div> }
+@if (!string.IsNullOrEmpty(Model.ErrorMessage)) { <div class="alert alert-error">@Model.ErrorMessage</div> }
+
+<div class="card" style="max-width:920px; margin-bottom:16px">
+    <h2>Загрузить справку (PDF / JPG / PNG, до @Model.MaxUploadMb МБ)</h2>
+    <form method="post" asp-page-handler="Upload" enctype="multipart/form-data">
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+            <input class="input" type="file" name="file" accept="application/pdf,image/jpeg,image/png" required />
+            <button type="submit" class="btn btn-primary">Загрузить</button>
+        </div>
+        <p class="note">Файл хранится вне публичной папки; в БД — путь, размер и SHA-256 (контроль подмены). Диагноз в систему не вносится.</p>
+    </form>
+</div>
+
+@if (Model.Scans.Count == 0)
+{
+    <div class="card empty">Сканов пока нет.</div>
+}
+else
+{
+    foreach (var row in Model.Scans)
+    {
+        <div class="card" style="max-width:920px; margin-bottom:14px">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px">
+                <div>
+                    <strong>@row.Item.OriginalFileName</strong>
+                    <span class="dim"> · @((row.Item.SizeBytes / 1024.0).ToString("0")) КБ · @row.Item.UploadedAt.ToString("dd.MM.yyyy HH:mm")</span>
+                    <div><span class="pill">Распознавание: @row.Item.RecognitionStatus</span></div>
+                </div>
+                <div style="display:flex; gap:8px">
+                    <a class="btn btn-sm" href="/scans/@row.Item.Id/file" target="_blank">Открыть</a>
+                    @if (Model.AiEnabled)
+                    {
+                        <form method="post" asp-page-handler="Recognize" style="margin:0">
+                            <input type="hidden" name="scanId" value="@row.Item.Id" />
+                            <button type="submit" class="btn btn-sm btn-primary">Распознать ИИ</button>
+                        </form>
+                    }
+                </div>
+            </div>
+
+            @if (row.Fields.Count > 0)
+            {
+                <div class="table-wrap" style="margin-top:12px">
+                    <table class="grid">
+                        <thead><tr><th>Поле (ИИ)</th><th>Значение</th></tr></thead>
+                        <tbody>
+                        @foreach (var f in row.Fields)
+                        {
+                            <tr><td class="dim">@f.Name</td><td>@(string.IsNullOrWhiteSpace(f.Value) ? "—" : f.Value)</td></tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+                <p class="note">⚠ Это черновик ИИ-предзаполнения, НЕ источник истины. Проверьте каждое поле и внесите справку вручную через «+ Добавить справку».</p>
+            }
+        </div>
+    }
+}
+
+@if (!Model.AiEnabled)
+{
+    <p class="note">ИИ-распознавание выключено (Recognition:Provider = Manual). Включается локальным провайдером (Ollama/VLM) в конфигурации — без внешних облаков.</p>
+}
+else
+{
+    <p class="note">ИИ-провайдер: локальный (@Model.AiModel). Обработка в периметре — медданные не уходят во внешние сервисы.</p>
+}

@@ -1,0 +1,47 @@
+@page "/Auth/Login"
+@model ReuMedCertificates.Web.Pages.Auth.LoginModel
+@{
+    Layout = null;
+    ViewData["Title"] = "Вход";
+}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Вход · Медсправки кафедры физкультуры РЭУ</title>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+<div class="auth-bg">
+    <div class="auth-card">
+        <div class="auth-logo"><img src="~/images/reu-logo.svg" alt="РЭУ им. Г.В. Плеханова" /></div>
+        <h1>Вход в систему</h1>
+        <p class="sub">Реестр медицинских справок и допусков к физкультуре</p>
+
+        @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+        {
+            <div class="alert alert-error">@Model.ErrorMessage</div>
+        }
+
+        <form method="post">
+            <div class="field">
+                <label asp-for="Input.Login">Логин</label>
+                <input class="input" asp-for="Input.Login" autocomplete="username" autofocus />
+                <span class="note" asp-validation-for="Input.Login"></span>
+            </div>
+            <div class="field">
+                <label asp-for="Input.Password">Пароль</label>
+                <input class="input" type="password" asp-for="Input.Password" autocomplete="current-password" />
+                <span class="note" asp-validation-for="Input.Password"></span>
+            </div>
+            <label class="check">
+                <input type="checkbox" asp-for="Input.RememberMe" />
+                <span>Запомнить меня</span>
+            </label>
+            <button type="submit" class="btn btn-primary" style="width:100%">Войти</button>
+        </form>
+    </div>
+</div>
+</body>
+</html>

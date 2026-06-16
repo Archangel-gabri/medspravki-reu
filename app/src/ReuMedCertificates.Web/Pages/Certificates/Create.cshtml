@@ -1,0 +1,80 @@
+@page "/students/{id:guid}/certificates/new"
+@model ReuMedCertificates.Web.Pages.Certificates.CreateModel
+@{
+    ViewData["Title"] = "Новая справка";
+}
+
+<div class="page-head">
+    <div>
+        <h1>Добавить справку</h1>
+        <p>Студент: <strong>@Model.StudentName</strong></p>
+    </div>
+    <div class="head-actions"><a class="btn" href="/students/@Model.StudentId">← К карточке</a></div>
+</div>
+
+<div class="card" style="max-width:760px">
+    @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+    {
+        <div class="alert alert-error">@Model.ErrorMessage</div>
+    }
+
+    <form method="post">
+        <div class="form-grid">
+            <div class="field">
+                <label asp-for="Input.StartDate">Дата начала действия</label>
+                <input class="input" type="date" asp-for="Input.StartDate" />
+                <span class="note" asp-validation-for="Input.StartDate"></span>
+            </div>
+            <div class="field">
+                <label asp-for="Input.EndDate">Дата окончания</label>
+                <input class="input" type="date" asp-for="Input.EndDate" />
+                <span class="note" asp-validation-for="Input.EndDate"></span>
+            </div>
+            <div class="field">
+                <label asp-for="Input.IssueDate">Дата выдачи (если указана)</label>
+                <input class="input" type="date" asp-for="Input.IssueDate" />
+            </div>
+            <div class="field">
+                <label asp-for="Input.CertificateNumber">Номер справки</label>
+                <input class="input" asp-for="Input.CertificateNumber" placeholder="напр. 086/у-1234" />
+            </div>
+            <div class="field">
+                <label asp-for="Input.PhysicalGroup">Физкультурная группа</label>
+                <select class="input" asp-for="Input.PhysicalGroup">
+                    @foreach (var g in Enum.GetValues<PhysicalEducationGroup>())
+                    {
+                        <option value="@g">@StatusDisplay.PhysicalGroup(g)</option>
+                    }
+                </select>
+            </div>
+            <div class="field">
+                <label asp-for="Input.HealthGroup">Группа здоровья</label>
+                <select class="input" asp-for="Input.HealthGroup">
+                    @foreach (var g in Enum.GetValues<HealthGroup>())
+                    {
+                        <option value="@g">@StatusDisplay.HealthGroup(g)</option>
+                    }
+                </select>
+            </div>
+            <div class="field full">
+                <label asp-for="Input.MedicalOrganization">Медицинская организация</label>
+                <input class="input" asp-for="Input.MedicalOrganization" placeholder="напр. Городская поликлиника №5" />
+            </div>
+            <div class="field full">
+                <label asp-for="Input.Restrictions">Ограничения (без диагноза)</label>
+                <textarea class="input" asp-for="Input.Restrictions" placeholder="напр. освобождение от бега, щадящий режим"></textarea>
+            </div>
+            <div class="field full">
+                <label asp-for="Input.Comment">Комментарий</label>
+                <textarea class="input" asp-for="Input.Comment"></textarea>
+            </div>
+        </div>
+
+        <p class="note">Внесение справки преподавателем фиксируется как проверенная (источник «ручной ввод»). Диагноз не вносится — только функциональные ограничения (152-ФЗ).</p>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Сохранить справку</button>
+            <a class="btn" href="/students/@Model.StudentId">Отмена</a>
+        </div>
+    </form>
+</div>

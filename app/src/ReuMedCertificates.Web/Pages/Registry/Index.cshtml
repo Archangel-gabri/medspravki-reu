@@ -1,0 +1,127 @@
+@page "/registry"
+@model ReuMedCertificates.Web.Pages.Registry.IndexModel
+@{
+    ViewData["Title"] = "Реестр справок";
+}
+
+<div class="page-head">
+    <div>
+        <h1>Реестр справок</h1>
+        <p>Студенты и медицинские допуски к занятиям. Поиск по ФИО, фильтры по подразделению, курсу, группе и преподавателю.</p>
+    </div>
+    <div class="head-actions">
+        <a class="btn btn-primary" href="/students/new">+ Добавить студента</a>
+    </div>
+</div>
+
+<form class="filters" method="get">
+    <div class="field">
+        <label>Поиск по ФИО</label>
+        <input class="input input-grow" name="q" value="@Model.Query" placeholder="напр. Иванов" />
+    </div>
+    <div class="field">
+        <label>Подразделение</label>
+        <select class="input" name="dept">
+            <option value="">Все</option>
+            @foreach (var d in Model.Departments)
+            {
+                <option value="@d.Id" selected="@(Model.DepartmentId == d.Id)">@d.Name</option>
+            }
+        </select>
+    </div>
+    <div class="field">
+        <label>Курс</label>
+        <select class="input" name="course" style="min-width:90px">
+            <option value="">Все</option>
+            @for (short c = 1; c <= 6; c++)
+            {
+                <option value="@c" selected="@(Model.Course == c)">@c</option>
+            }
+        </select>
+    </div>
+    <div class="field">
+        <label>Группа</label>
+        <select class="input" name="group">
+            <option value="">Все</option>
+            @foreach (var g in Model.Groups)
+            {
+                <option value="@g.Id" selected="@(Model.StudyGroupId == g.Id)">@g.Name</option>
+            }
+        </select>
+    </div>
+    <div class="field">
+        <label>Преподаватель</label>
+        <select class="input" name="teacher">
+            <option value="">Все</option>
+            @foreach (var t in Model.Teachers)
+            {
+                <option value="@t.Id" selected="@(Model.TeacherId == t.Id)">@t.FullName</option>
+            }
+        </select>
+    </div>
+    <div class="field">
+        <label>&nbsp;</label>
+        <div style="display:flex; gap:8px">
+            <button type="submit" class="btn btn-primary">Найти</button>
+            <a class="btn" href="/registry">Сброс</a>
+        </div>
+    </div>
+</form>
+
+<div class="table-wrap">
+    <table class="grid">
+        <thead>
+            <tr>
+                <th>ФИО</th>
+                <th>Подразделение</th>
+                <th>Курс</th>
+                <th>Группа</th>
+                <th>Преподаватель</th>
+                <th>Физ. группа</th>
+                <th>Срок справки</th>
+                <th>Статус</th>
+            </tr>
+        </thead>
+        <tbody>
+        @if (Model.Result.Rows.Count == 0)
+        {
+            <tr><td colspan="8" class="empty">Ничего не найдено. Измените фильтры или <a href="/students/new">добавьте студента</a>.</td></tr>
+        }
+        @foreach (var r in Model.Result.Rows)
+        {
+            var cls = StatusDisplay.CertClass(r.Status);
+            <tr class="row-status @cls">
+                <td class="name-cell"><a href="/students/@r.StudentId">@r.FullName</a></td>
+                <td class="dim">@r.Department</td>
+                <td>@r.Course</td>
+                <td>@r.Group</td>
+                <td class="dim">@(r.Teacher ?? "—")</td>
+                <td>@StatusDisplay.PhysicalGroup(r.PhysicalGroup)</td>
+                <td class="dim">@(r.StartDate is null ? "—" : $"{r.StartDate:dd.MM.yyyy} – {r.EndDate:dd.MM.yyyy}")</td>
+                <td>
+                    @if (r.Status is null && r.HasPendingReview)
+                    {
+                        <span class="badge muted"><span class="dot"></span>На проверке</span>
+                    }
+                    else
+                    {
+                        <span class="badge @cls"><span class="dot"></span>@StatusDisplay.CertText(r.Status)</span>
+                    }
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>
+
+<div class="pager">
+    <span>Найдено: <strong>@Model.Result.Total</strong> · страница @Model.Result.Page из @Model.TotalPages</span>
+    @if (Model.Result.Page > 1)
+    {
+        <a class="btn btn-sm" href="@Url.Page(null, new { q = Model.Query, dept = Model.DepartmentId, course = Model.Course, group = Model.StudyGroupId, teacher = Model.TeacherId, p = Model.Result.Page - 1 })">← Назад</a>
+    }
+    @if (Model.Result.Page < Model.TotalPages)
+    {
+        <a class="btn btn-sm" href="@Url.Page(null, new { q = Model.Query, dept = Model.DepartmentId, course = Model.Course, group = Model.StudyGroupId, teacher = Model.TeacherId, p = Model.Result.Page + 1 })">Вперёд →</a>
+    }
+</div>

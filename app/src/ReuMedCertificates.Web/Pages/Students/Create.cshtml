@@ -1,0 +1,87 @@
+@page "/students/new"
+@model ReuMedCertificates.Web.Pages.Students.CreateModel
+@{
+    ViewData["Title"] = "Новый студент";
+}
+
+<div class="page-head">
+    <div>
+        <h1>Добавить студента</h1>
+        <p>Карточка студента. Справку можно добавить после сохранения.</p>
+    </div>
+    <div class="head-actions"><a class="btn" href="/registry">← К реестру</a></div>
+</div>
+
+<div class="card" style="max-width:720px">
+    @if (Model.DuplicateStudentId is { } dupId)
+    {
+        <div class="alert alert-warn">
+            Похоже, такой студент в этой группе уже есть.
+            <a href="/students/@dupId">Открыть существующую карточку</a>, либо подтвердите создание нового.
+        </div>
+    }
+
+    <form method="post">
+        <div class="form-grid">
+            <div class="field full">
+                <label asp-for="Input.FullName">ФИО</label>
+                <input class="input" asp-for="Input.FullName" placeholder="Фамилия Имя Отчество" />
+                <span class="note" asp-validation-for="Input.FullName"></span>
+            </div>
+            <div class="field">
+                <label asp-for="Input.DepartmentId">Подразделение</label>
+                <select class="input" asp-for="Input.DepartmentId">
+                    <option value="">— выберите —</option>
+                    @foreach (var d in Model.Departments)
+                    {
+                        <option value="@d.Id">@d.Name</option>
+                    }
+                </select>
+                <span class="note" asp-validation-for="Input.DepartmentId"></span>
+            </div>
+            <div class="field">
+                <label asp-for="Input.Course">Курс</label>
+                <select class="input" asp-for="Input.Course">
+                    @for (short c = 1; c <= 6; c++)
+                    {
+                        <option value="@c">@c</option>
+                    }
+                </select>
+            </div>
+            <div class="field">
+                <label asp-for="Input.StudyGroupId">Группа</label>
+                <select class="input" asp-for="Input.StudyGroupId">
+                    <option value="">— выберите —</option>
+                    @foreach (var g in Model.Groups)
+                    {
+                        <option value="@g.Id">@g.Name (@g.Course курс)</option>
+                    }
+                </select>
+                <span class="note" asp-validation-for="Input.StudyGroupId"></span>
+            </div>
+            <div class="field">
+                <label asp-for="Input.TeacherId">Преподаватель</label>
+                <select class="input" asp-for="Input.TeacherId">
+                    <option value="">— не назначен —</option>
+                    @foreach (var t in Model.Teachers)
+                    {
+                        <option value="@t.Id">@t.FullName</option>
+                    }
+                </select>
+            </div>
+        </div>
+
+        @if (Model.DuplicateStudentId is not null)
+        {
+            <label class="check" style="margin-top:12px">
+                <input type="checkbox" asp-for="Input.ConfirmDuplicate" />
+                <span>Всё равно создать нового студента</span>
+            </label>
+        }
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Сохранить</button>
+            <a class="btn" href="/registry">Отмена</a>
+        </div>
+    </form>
+</div>

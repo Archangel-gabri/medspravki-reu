@@ -1,0 +1,89 @@
+using Microsoft.EntityFrameworkCore;
+using ReuMedCertificates.Application.Abstractions;
+using ReuMedCertificates.Application.Common;
+using ReuMedCertificates.Domain.Entities;
+using ReuMedCertificates.Domain.Enums;
+
+namespace ReuMedCertificates.Application.Registry;
+
+public sealed class RegistryQueryService : IRegistryQueryService
+{
+    private readonly IApplicationDbContext _db;
+    private readonly IDateTimeProvider _clock;
+    private readonly CertificateOptions _options;
+
+    public RegistryQueryService(IApplicationDbContext db, IDateTimeProvider clock, CertificateOptions options)
+    {
+        _db = db;
+        _clock = clock;
+        _options = options;
+    }
+
+    public async Task<RegistryPage> SearchAsync(RegistryFilter filter, CancellationToken cancellationToken = default)
+    {
+        var query = _db.Students.AsNoTracking().Where(s => s.IsActive);
+
+        if (filter.DepartmentId is { } departmentId)
+            query = query.Where(s => s.DepartmentId == departmentId);
+        if (filter.Course is { } course)
+            query = query.Where(s => s.Course == course);
+        if (filter.StudyGroupId is { } groupId)
+            query = query.Where(s => s.StudyGroupId == groupId);
+        if (filter.TeacherId is { } teacherId)
+            query = query.Where(s => s.TeacherId == teacherId);
+
+        if (!string.IsNullOrWhiteSpace(filter.Query))
+        {
+            var normalized = Student.Normalize(filter.Query);
+            // Колонка нормализована (lower); pg_trgm GIN-индекс ускоряет LIKE с обоими wildcard.
+            query = query.Where(s => EF.Functions.Like(s.NormalizedFullName, $"%{normalized}%"));
+        }
+
+        var total = await query.CountAsync(cancellationToken);
+        var page = Math.Max(1, filter.Page);
+        var size = Math.Clamp(filter.PageSize, 1, 200);
+
+        var projected = await query
+            .OrderBy(s => s.FullName)
+            .Skip((page - 1) * size)
+            .Take(size)
+            .Select(s => new
+            {
+                s.Id,
+                s.FullName,
+                Department = s.Department!.Name,
+                s.Course,
+                Group = s.StudyGroup!.Name,
+                Teacher = s.Teacher != null ? s.Teacher.FullName : null,
+                // Допуск считается ТОЛЬКО по подтверждённой человеком справке (Verified).
+                Cert = s.Certificates
+                    .Where(c => !c.IsDeleted && c.VerificationStatus == VerificationStatus.Verified)
+                    .OrderByDescending(c => c.EndDate)
+                    .FirstOrDefault(),
+                // Есть ли неподтверждённая справка в работе (черновик/на проверке).
+                HasPendingReview = s.Certificates.Any(c => !c.IsDeleted &&
+                    (c.VerificationStatus == VerificationStatus.NeedsReview || c.VerificationStatus == VerificationStatus.Draft))
+            })
+            .ToListAsync(cancellationToken);
+
+        var today = _clock.Today;
+        var threshold = _options.ExpiringSoonThresholdDays;
+
+        var rows = projected.Select(x => new RegistryRow(
+            x.Id,
+            x.FullName,
+            x.Department,
+            x.Course,
+            x.Group,
+            x.Teacher,
+            x.Cert?.PhysicalGroup ?? PhysicalEducationGroup.None,
+            x.Cert?.Restrictions,
+            x.Cert is null ? null : x.Cert.StartDate,
+            x.Cert is null ? null : x.Cert.EndDate,
+            x.Cert is null ? null : x.Cert.GetStatus(today, threshold),
+            x.HasPendingReview))
+            .ToList();
+
+        return new RegistryPage(rows, total, page, size);
+    }
+}

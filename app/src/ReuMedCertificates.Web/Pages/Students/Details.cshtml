@@ -1,0 +1,81 @@
+@page "/students/{id:guid}"
+@model ReuMedCertificates.Web.Pages.Students.DetailsModel
+@{
+    ViewData["Title"] = "Карточка студента";
+    var s = Model.Student;
+}
+
+<div class="page-head">
+    <div>
+        <h1>@s.FullName</h1>
+        <p>@s.Department · @s.Course курс · группа @s.Group</p>
+    </div>
+    <div class="head-actions">
+        <a class="btn" href="/registry">← К реестру</a>
+        <a class="btn" href="/students/@s.Id/scans">Сканы и ИИ</a>
+        <a class="btn btn-primary" href="/students/@s.Id/certificates/new">+ Добавить справку</a>
+    </div>
+</div>
+
+<div class="cards">
+    <div class="card">
+        <h2>Данные студента</h2>
+        <dl class="kv">
+            <dt>ФИО</dt><dd>@s.FullName</dd>
+            <dt>Подразделение</dt><dd>@s.Department</dd>
+            <dt>Курс</dt><dd>@s.Course</dd>
+            <dt>Группа</dt><dd>@s.Group</dd>
+            <dt>Преподаватель</dt><dd>@(s.Teacher ?? "—")</dd>
+        </dl>
+        <p class="note">Группа здоровья и ограничения хранятся в справке (ниже), а не в общем профиле — это минимизация медданных (152-ФЗ).</p>
+    </div>
+
+    <div class="card">
+        <h2>Текущая справка</h2>
+        @if (s.Current.Count == 0)
+        {
+            <div class="empty">Действующей справки нет. <a href="/students/@s.Id/certificates/new">Добавить</a>.</div>
+        }
+        else
+        {
+            foreach (var c in s.Current)
+            {
+                var cls = StatusDisplay.CertClass(c.Status);
+                <div class="row-status @cls" style="border-left-width:4px; padding-left:12px; margin-bottom:14px">
+                    <span class="badge @cls"><span class="dot"></span>@StatusDisplay.CertText(c.Status)</span>
+                    <dl class="kv" style="margin-top:10px">
+                        <dt>Срок действия</dt><dd>@c.StartDate.ToString("dd.MM.yyyy") – @c.EndDate.ToString("dd.MM.yyyy")</dd>
+                        <dt>Физ. группа</dt><dd>@StatusDisplay.PhysicalGroup(c.PhysicalGroup)</dd>
+                        <dt>Группа здоровья</dt><dd>@StatusDisplay.HealthGroup(c.HealthGroup)</dd>
+                        <dt>Ограничения</dt><dd>@(string.IsNullOrWhiteSpace(c.Restrictions) ? "—" : c.Restrictions)</dd>
+                        <dt>Справка №</dt><dd>@(c.CertificateNumber ?? "—")</dd>
+                        <dt>Мед. организация</dt><dd>@(c.MedicalOrganization ?? "—")</dd>
+                        <dt>Проверка</dt><dd><span class="pill">@StatusDisplay.Verification(c.VerificationStatus)</span></dd>
+                    </dl>
+                </div>
+            }
+        }
+
+        @if (s.History.Count > 0)
+        {
+            <h2 style="margin-top:18px">История справок</h2>
+            <div class="table-wrap">
+                <table class="grid">
+                    <thead><tr><th>Срок</th><th>Физ. группа</th><th>Ограничения</th><th>Статус</th></tr></thead>
+                    <tbody>
+                    @foreach (var c in s.History)
+                    {
+                        var cls = StatusDisplay.CertClass(c.Status);
+                        <tr class="row-status @cls">
+                            <td class="dim">@c.StartDate.ToString("dd.MM.yyyy") – @c.EndDate.ToString("dd.MM.yyyy")</td>
+                            <td>@StatusDisplay.PhysicalGroup(c.PhysicalGroup)</td>
+                            <td class="dim">@(string.IsNullOrWhiteSpace(c.Restrictions) ? "—" : c.Restrictions)</td>
+                            <td><span class="badge @cls"><span class="dot"></span>@StatusDisplay.CertText(c.Status)</span></td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>

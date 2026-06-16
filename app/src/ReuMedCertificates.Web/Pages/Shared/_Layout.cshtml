@@ -1,0 +1,74 @@
+@{
+    var path = (Context.Request.Path.Value ?? "/").ToLowerInvariant();
+    string active(string prefix) => path.StartsWith(prefix) ? "active" : "";
+    var userName = User.Identity?.Name ?? "—";
+    var title = ViewData["Title"] as string ?? "";
+}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@(string.IsNullOrEmpty(title) ? "Медсправки" : title) · Кафедра физкультуры РЭУ</title>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+    <div class="top-black-menu">
+        <div class="container">
+            <span>Личный кабинет</span>
+            <span class="tb-muted">РЭУ им. Г.В. Плеханова</span>
+        </div>
+    </div>
+
+    <header class="es-header">
+        <div class="container">
+            <a class="es-logo" href="/registry"><img src="~/images/reu-logo.svg" alt="РЭУ им. Г.В. Плеханова" /></a>
+            <div class="es-logo-sub">
+                <strong>Учёт медицинских справок</strong>
+                <span>Кафедра физической культуры</span>
+            </div>
+            <div class="es-user">
+                <div>
+                    <div class="es-user__name">@userName</div>
+                    <div class="es-user__role">Преподаватель</div>
+                </div>
+                <form method="post" action="/Auth/Logout" class="logout-form">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-sm">Выйти</button>
+                </form>
+            </div>
+        </div>
+    </header>
+
+    <nav class="bluemenu">
+        <div class="container">
+            <ol class="crumbs">
+                <li><a href="/registry">Главная</a></li>
+                @if (!string.IsNullOrEmpty(title))
+                {
+                    <li class="active">@title</li>
+                }
+            </ol>
+        </div>
+    </nav>
+
+    <div class="container shell">
+        <aside class="sidemenu">
+            <ul>
+                <li class="@active("/registry")"><a href="/registry">Реестр справок</a></li>
+                <li class="@active("/before-class")"><a href="/before-class">Перед парой</a></li>
+                <li class="@active("/review")"><a href="/review">На проверке</a></li>
+                <li class="@active("/import")"><a href="/import">Импорт 1С/SQL</a></li>
+                <li class="@active("/journal")"><a href="/journal">Журнал</a></li>
+            </ul>
+        </aside>
+        <main class="content">
+            @RenderBody()
+        </main>
+    </div>
+
+    <footer class="es-footer">
+        <div class="container">© @DateTime.Now.Year · ФГБОУ ВО «РЭУ им. Г.В. Плеханова» · Кафедра физической культуры</div>
+    </footer>
+</body>
+</html>

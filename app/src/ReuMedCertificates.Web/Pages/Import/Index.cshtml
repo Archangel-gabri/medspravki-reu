@@ -1,0 +1,83 @@
+@page "/import"
+@using ReuMedCertificates.Application.Roster
+@model ReuMedCertificates.Web.Pages.Import.IndexModel
+@{
+    ViewData["Title"] = "Импорт 1С/SQL";
+}
+
+<div class="page-head">
+    <div>
+        <h1>Импорт реестра из 1С / SQL</h1>
+        <p>Загрузка студентов, групп и привязки к преподавателям из внешней системы. Существующие записи не дублируются (сверка по ФИО и группе).</p>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(Model.Message))
+{
+    <div class="alert alert-warn">@Model.Message</div>
+}
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div class="alert alert-error">@Model.ErrorMessage</div>
+}
+
+@if (Model.Preview is { } p)
+{
+    <div class="filters" style="justify-content:space-between; align-items:center">
+        <div class="field">
+            <label>Источник данных</label>
+            <div><strong>@p.SourceName</strong></div>
+        </div>
+        <div style="display:flex; gap:18px; align-items:center">
+            <span class="dim">Новых: <strong>@p.NewCount</strong> · уже в реестре: @p.ExistsCount · конфликтов: @p.ConflictCount</span>
+            <form method="post" style="margin:0">
+                <button class="btn btn-primary" asp-page-handler="Import" disabled="@(p.NewCount == 0)">Импортировать @p.NewCount</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="table-wrap">
+        <table class="grid">
+            <thead>
+                <tr>
+                    <th>ФИО</th>
+                    <th>Подразделение</th>
+                    <th>Курс</th>
+                    <th>Группа</th>
+                    <th>Преподаватель</th>
+                    <th>Действие</th>
+                </tr>
+            </thead>
+            <tbody>
+            @if (p.Rows.Count == 0)
+            {
+                <tr><td colspan="6" class="empty">Источник не вернул данных.</td></tr>
+            }
+            @foreach (var r in p.Rows)
+            {
+                <tr>
+                    <td class="name-cell">@r.FullName</td>
+                    <td class="dim">@r.DepartmentName</td>
+                    <td>@r.Course</td>
+                    <td>@r.GroupName</td>
+                    <td class="dim">@(r.TeacherName ?? "—")</td>
+                    <td>
+                        @if (r.Action == RosterRowAction.New)
+                        {
+                            <span class="pill" style="color:#2f6b46; border-color:#bfe0cb">Новый</span>
+                        }
+                        else if (r.Action == RosterRowAction.Exists)
+                        {
+                            <span class="pill">Уже есть</span>
+                        }
+                        else
+                        {
+                            <span class="pill" style="color:#a5342b; border-color:#e8c4c1">@(r.Note ?? "Конфликт")</span>
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}

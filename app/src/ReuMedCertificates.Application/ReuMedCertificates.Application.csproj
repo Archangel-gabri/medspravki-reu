@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\ReuMedCertificates.Domain\ReuMedCertificates.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- IApplicationDbContext выставляет DbSet<> в Application-слой (паттерн Clean Architecture). -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.4" />
+  </ItemGroup>
+</Project>
