@@ -5,10 +5,8 @@
     var title = ViewData["Title"] as string ?? "";
     var roleLabel = User.IsInRole("Admin") ? "Администратор"
         : User.IsInRole("HeadOfDepartment") ? "Зав. кафедрой"
-        : User.IsInRole("MedicalStaff") ? "Медработник"
         : User.IsInRole("Teacher") ? "Преподаватель"
         : User.IsInRole("Student") ? "Студент" : "Пользователь";
-    bool isMedical = User.IsInRole("MedicalStaff");
     bool isAdminOrHead = User.IsInRole("Admin") || User.IsInRole("HeadOfDepartment");
     bool isStudent = User.IsInRole("Student");
     var home = isStudent ? "/me" : "/registry";
@@ -72,11 +70,8 @@
                 {
                     <li class="@active("/registry")"><a href="/registry">Реестр справок</a></li>
                     <li class="@active("/before-class")"><a href="/before-class">Перед парой</a></li>
-                    @if (isMedical)
-                    {
-                        <li class="@active("/submissions")"><a href="/submissions">Заявки студентов</a></li>
-                        <li class="@active("/review")"><a href="/review">На проверке</a></li>
-                    }
+                    <li class="@active("/submissions")"><a href="/submissions">Заявки студентов</a></li>
+                    <li class="@active("/review")"><a href="/review">На проверке</a></li>
                     @if (isAdminOrHead)
                     {
                         <li class="@active("/import")"><a href="/import">Импорт 1С/SQL</a></li>

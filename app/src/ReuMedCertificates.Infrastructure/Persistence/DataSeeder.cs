@@ -25,6 +25,14 @@ public static class DataSeeder
             if (!await roleManager.RoleExistsAsync(role))
                 await roleManager.CreateAsync(new AppRole(role));
 
+        // Роль медработника удалена (2026-06-18): её функции переданы преподавателю.
+        // Идемпотентная зачистка для существующих БД — убрать демо-юзера medic и роль MedicalStaff.
+        var cleanupUm = sp.GetRequiredService<UserManager<AppUser>>();
+        if (await cleanupUm.FindByNameAsync("medic") is { } medicUser)
+            await cleanupUm.DeleteAsync(medicUser);
+        if (await roleManager.FindByNameAsync("MedicalStaff") is { } medRole)
+            await roleManager.DeleteAsync(medRole);
+
         var bootstrap = configuration.GetSection("BootstrapUser");
         if (bootstrap.GetValue<bool>("Enabled"))
         {
@@ -59,7 +67,6 @@ public static class DataSeeder
             // Демо-пользователи СТРОГО по одной роли (логичное разграничение прав).
             var userMgr = sp.GetRequiredService<UserManager<AppUser>>();
             await EnsureDemoUserAsync(userMgr, "teacher", "Преподаватель (демо)", AppRoles.Teacher);
-            await EnsureDemoUserAsync(userMgr, "medic", "Медработник (демо)", AppRoles.MedicalStaff);
             await EnsureDemoUserAsync(userMgr, "head", "Зав. кафедрой (демо)", AppRoles.HeadOfDepartment);
             await EnsureDemoUserAsync(userMgr, "admin", "Администратор (демо)", AppRoles.Admin);
 

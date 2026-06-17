@@ -15,10 +15,8 @@ public static class AppRoles
     public const string Teacher = "Teacher";
     public const string HeadOfDepartment = "HeadOfDepartment";
     public const string Admin = "Admin";
-    /// <summary>Медработник — единственный, кто даёт медвердикт по справке (323-ФЗ ст.13).</summary>
-    public const string MedicalStaff = "MedicalStaff";
-    /// <summary>Студент — видит только свой допуск (портал студента — фаза v2).</summary>
+    /// <summary>Студент — видит только свой допуск.</summary>
     public const string Student = "Student";
 
-    public static readonly string[] All = { Teacher, HeadOfDepartment, Admin, MedicalStaff, Student };
+    public static readonly string[] All = { Teacher, HeadOfDepartment, Admin, Student };
 }

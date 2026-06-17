@@ -35,10 +35,9 @@ builder.Services.AddRazorPages(options =>
     // Журнал аудита и импорт реестра — администрация (завкафедрой/админ), не физрук/медработник.
     options.Conventions.AuthorizePage("/Journal/Index", "AdminOrHead");
     options.Conventions.AuthorizePage("/Import/Index", "AdminOrHead");
-    // Очередь заявок и подтверждение справки (медвердикт по 323-ФЗ) — ТОЛЬКО медработник.
-    options.Conventions.AuthorizeFolder("/Review", "Medical");
-    // Просмотр сканов/справок — любой сотрудник (физрук тоже видит справки); обработку сканов
-    // (распознавание/создание/отклонение) в самой странице ограничиваем медработником.
+    // Очередь заявок студентов и подтверждение справки — сотрудники кафедры (физрук/завкаф/админ).
+    options.Conventions.AuthorizeFolder("/Review", "StaffOnly");
+    // Сканы/справки — сотрудники кафедры (физрук обрабатывает сканы и оформляет справки).
     options.Conventions.AuthorizeFolder("/Scans", "StaffOnly");
     // Личный кабинет студента — ТОЛЬКО роль Student (видит свой допуск, не чужие данные).
     options.Conventions.AuthorizePage("/Me/Index", "StudentOnly");
@@ -47,12 +46,10 @@ builder.Services.AddRazorPages(options =>
 // Ролевые политики — логичное разграничение по ролям (минимизация прав).
 builder.Services.AddAuthorization(options =>
 {
-    // Базовый доступ (реестр, «Перед парой», карточки) — любой сотрудник.
-    options.AddPolicy("StaffOnly", p => p.RequireRole("Teacher", "HeadOfDepartment", "Admin", "MedicalStaff"));
+    // Базовый доступ (реестр, «Перед парой», карточки, сканы, проверка) — любой сотрудник кафедры.
+    options.AddPolicy("StaffOnly", p => p.RequireRole("Teacher", "HeadOfDepartment", "Admin"));
     // Администрирование (журнал, импорт) — завкафедрой/админ.
     options.AddPolicy("AdminOrHead", p => p.RequireRole("HeadOfDepartment", "Admin"));
-    // Медицинские данные/вердикт — только медработник (не админ — минимизация).
-    options.AddPolicy("Medical", p => p.RequireRole("MedicalStaff"));
     // Личный кабинет — только студент.
     options.AddPolicy("StudentOnly", p => p.RequireRole("Student"));
     // Безопасный дефолт: любая страница без явной политики всё равно требует входа (deny-by-default).
@@ -132,7 +129,7 @@ app.MapGet("/scans/{id:guid}/file", async (
     http.Response.Headers["Cache-Control"] = "no-store";
     http.Response.Headers["Content-Disposition"] = "inline";
     return Results.File(content.Stream, content.ContentType, enableRangeProcessing: true);
-}).RequireAuthorization(policy => policy.RequireRole("Teacher", "HeadOfDepartment", "Admin", "MedicalStaff"));
+}).RequireAuthorization(policy => policy.RequireRole("Teacher", "HeadOfDepartment", "Admin"));
 
 app.MapRazorPages();
 
