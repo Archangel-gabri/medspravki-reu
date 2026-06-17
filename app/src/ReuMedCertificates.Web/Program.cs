@@ -35,8 +35,8 @@ builder.Services.AddRazorPages(options =>
     // Журнал аудита и импорт реестра — администрация (завкафедрой/админ), не физрук/медработник.
     options.Conventions.AuthorizePage("/Journal/Index", "AdminOrHead");
     options.Conventions.AuthorizePage("/Import/Index", "AdminOrHead");
-    // Медданные (сканы, распознавание, подтверждение справки) — ТОЛЬКО медработник (152-ФЗ минимизация, 323-ФЗ).
-    options.Conventions.AuthorizePage("/Review/Index", "Medical");
+    // Медданные (сканы, распознавание, очередь заявок, подтверждение справки) — ТОЛЬКО медработник (152-ФЗ, 323-ФЗ).
+    options.Conventions.AuthorizeFolder("/Review", "Medical");
     options.Conventions.AuthorizeFolder("/Scans", "Medical");
     // Личный кабинет студента — ТОЛЬКО роль Student (видит свой допуск, не чужие данные).
     options.Conventions.AuthorizePage("/Me/Index", "StudentOnly");

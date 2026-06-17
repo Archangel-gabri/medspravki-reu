@@ -2,9 +2,11 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using ReuMedCertificates.Application.Abstractions;
+using ReuMedCertificates.Application.Certificates;
 using ReuMedCertificates.Application.Common;
 using ReuMedCertificates.Application.Scans;
 using ReuMedCertificates.Application.Students;
+using ReuMedCertificates.Domain.Enums;
 
 namespace ReuMedCertificates.Web.Pages.Scans;
 
@@ -75,6 +77,30 @@ public class IndexModel : PageModel
         Message = result is null
             ? "Распознавание недоступно или не удалось (см. журнал)."
             : $"Распознано полей: {result.Fields.Count}. Проверьте и подтвердите вручную.";
+
+        await LoadAsync(id, cancellationToken);
+        return Page();
+    }
+
+    // Медработник подтверждает поля (human-in-the-loop, ФЗ-273) → создаётся справка из скана и связывается с ним.
+    public async Task<IActionResult> OnPostCreateCertAsync(
+        Guid id, Guid scanId, DateOnly startDate, DateOnly endDate, DateOnly? issueDate,
+        PhysicalEducationGroup physicalGroup, HealthGroup healthGroup,
+        string? certificateNumber, string? medicalOrganization, string? restrictions,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _scans.CreateCertificateFromScanAsync(scanId,
+                new AddCertificateRequest(id, startDate, endDate, issueDate, healthGroup, physicalGroup,
+                    restrictions, null, certificateNumber, medicalOrganization),
+                cancellationToken);
+            Message = "Справка создана из скана и подтверждена. Допуск студента обновлён.";
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
 
         await LoadAsync(id, cancellationToken);
         return Page();

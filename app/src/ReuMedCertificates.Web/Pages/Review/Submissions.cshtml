@@ -1,0 +1,41 @@
+@page "/submissions"
+@model ReuMedCertificates.Web.Pages.Review.SubmissionsModel
+@{
+    ViewData["Title"] = "Заявки студентов";
+}
+
+<div class="page-head">
+    <div>
+        <h1>Заявки студентов</h1>
+        <p>Сканы справок, загруженные студентами через личный кабинет, по которым ещё не оформлена справка.</p>
+    </div>
+</div>
+
+@if (Model.Items.Count == 0)
+{
+    <div class="card empty">Новых заявок нет.</div>
+}
+else
+{
+    <div class="card">
+        <div class="table-wrap">
+            <table class="grid">
+                <thead><tr><th>Студент</th><th>Группа</th><th>Файл</th><th>Загружена</th><th>ИИ</th><th></th></tr></thead>
+                <tbody>
+                @foreach (var it in Model.Items)
+                {
+                    <tr>
+                        <td><a href="/students/@it.StudentId">@it.StudentName</a></td>
+                        <td class="dim">@it.Group</td>
+                        <td>@it.OriginalFileName</td>
+                        <td class="dim">@it.UploadedAt.ToString("dd.MM.yyyy HH:mm")</td>
+                        <td><span class="pill">@it.RecognitionStatus</span></td>
+                        <td><a class="btn btn-sm btn-primary" href="/students/@it.StudentId/scans">Обработать</a></td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+        <p class="note">«Обработать» → просмотр скана, ИИ-распознавание и создание справки. Медицинское содержимое доступно только медработнику.</p>
+    </div>
+}

@@ -66,7 +66,47 @@ else
                         </tbody>
                     </table>
                 </div>
-                <p class="note">⚠ Это черновик ИИ-предзаполнения, НЕ источник истины. Проверьте каждое поле и внесите справку вручную через «+ Добавить справку».</p>
+                <p class="note">⚠ Это черновик ИИ-предзаполнения, НЕ источник истины. Проверьте и подтвердите каждое поле.</p>
+            }
+
+            @if (row.Item.CertificateId is null)
+            {
+                <details style="margin-top:12px">
+                    <summary style="cursor:pointer; color:#1F5BA8; font-weight:600">Создать справку из этого скана</summary>
+                    <form method="post" asp-page-handler="CreateCert" style="margin-top:10px">
+                        <input type="hidden" name="scanId" value="@row.Item.Id" />
+                        <div style="display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px">
+                            <label>Дата начала<input class="input" type="date" name="startDate" required /></label>
+                            <label>Дата окончания<input class="input" type="date" name="endDate" required /></label>
+                            <label>Дата выдачи<input class="input" type="date" name="issueDate" /></label>
+                            <label>Справка №<input class="input" name="certificateNumber" /></label>
+                            <label>Физкультурная группа
+                                <select class="input" name="physicalGroup">
+                                    @foreach (var pg in Enum.GetValues<PhysicalEducationGroup>())
+                                    {
+                                        <option value="@pg">@StatusDisplay.PhysicalGroup(pg)</option>
+                                    }
+                                </select>
+                            </label>
+                            <label>Группа здоровья
+                                <select class="input" name="healthGroup">
+                                    @foreach (var hg in Enum.GetValues<HealthGroup>())
+                                    {
+                                        <option value="@hg">@StatusDisplay.HealthGroup(hg)</option>
+                                    }
+                                </select>
+                            </label>
+                            <label>Мед. организация<input class="input" name="medicalOrganization" /></label>
+                        </div>
+                        <label style="display:block; margin-top:8px">Ограничения<textarea class="input" name="restrictions" rows="2"></textarea></label>
+                        <button type="submit" class="btn btn-primary" style="margin-top:10px">Создать и подтвердить справку</button>
+                        <p class="note">Поля вносит и подтверждает медработник — ИИ лишь подсказывает. После создания справка сразу становится действующим допуском студента.</p>
+                    </form>
+                </details>
+            }
+            else
+            {
+                <p class="note" style="margin-top:12px">✓ По этому скану справка уже создана и подтверждена.</p>
             }
         </div>
     }

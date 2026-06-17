@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using ReuMedCertificates.Application.Abstractions;
+using ReuMedCertificates.Application.Certificates;
 using ReuMedCertificates.Application.Common;
 using ReuMedCertificates.Domain.Entities;
 using ReuMedCertificates.Domain.Enums;
@@ -19,6 +20,11 @@ public sealed record ScanDetail(
     Guid Id, Guid StudentId, string OriginalFileName, long SizeBytes, DateTime UploadedAt,
     string RecognitionStatus, string? RecognitionModel, string? RecognitionJson);
 
+/// <summary>Элемент очереди медработника: загруженный студентом скан, по которому ещё не создана справка.</summary>
+public sealed record PendingScanItem(
+    Guid ScanId, Guid StudentId, string StudentName, string Group,
+    string OriginalFileName, DateTime UploadedAt, string RecognitionStatus);
+
 public interface IScanService
 {
     Task<Guid> UploadAsync(ScanUploadRequest request, CancellationToken cancellationToken = default);
@@ -26,6 +32,14 @@ public interface IScanService
     Task<ScanContent?> OpenAsync(Guid scanId, CancellationToken cancellationToken = default);
     Task<ScanDetail?> GetAsync(Guid scanId, CancellationToken cancellationToken = default);
     Task<RecognitionResult?> RecognizeAsync(Guid scanId, CancellationToken cancellationToken = default);
+
+    /// <summary>Очередь заявок студентов (сканы без созданной справки) — для медработника.</summary>
+    Task<IReadOnlyList<PendingScanItem>> ListPendingStudentScansAsync(CancellationToken cancellationToken = default);
+    Task<int> CountPendingStudentScansAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Медработник создаёт подтверждённую справку по скану студента и связывает скан с ней.
+    /// Студент берётся из скана (целостность), факт подтверждается человеком (Verified).</summary>
+    Task<Guid> CreateCertificateFromScanAsync(Guid scanId, AddCertificateRequest request, CancellationToken cancellationToken = default);
 }
 
 public sealed class ScanService : IScanService
@@ -83,6 +97,66 @@ public sealed class ScanService : IScanService
             .OrderByDescending(s => s.CreatedAt)
             .Select(s => new ScanListItem(s.Id, s.OriginalFileName, s.SizeBytes, s.CreatedAt, s.RecognitionStatus, s.CertificateId))
             .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<PendingScanItem>> ListPendingStudentScansAsync(CancellationToken cancellationToken = default) =>
+        await _db.Scans.AsNoTracking()
+            .Where(s => s.CertificateId == null && s.Source == DraftSource.StudentUpload)
+            .OrderBy(s => s.CreatedAt)
+            .Select(s => new PendingScanItem(
+                s.Id, s.StudentId, s.Student!.FullName, s.Student.StudyGroup!.Name,
+                s.OriginalFileName, s.CreatedAt, s.RecognitionStatus))
+            .ToListAsync(cancellationToken);
+
+    public async Task<int> CountPendingStudentScansAsync(CancellationToken cancellationToken = default) =>
+        await _db.Scans.AsNoTracking()
+            .CountAsync(s => s.CertificateId == null && s.Source == DraftSource.StudentUpload, cancellationToken);
+
+    public async Task<Guid> CreateCertificateFromScanAsync(Guid scanId, AddCertificateRequest request, CancellationToken cancellationToken = default)
+    {
+        var scan = await _db.Scans.FirstOrDefaultAsync(s => s.Id == scanId, cancellationToken)
+            ?? throw new InvalidOperationException("Скан не найден.");
+        if (scan.CertificateId is not null)
+            throw new InvalidOperationException("По этому скану справка уже создана.");
+        if (request.EndDate < request.StartDate)
+            throw new InvalidOperationException("Дата окончания не может быть раньше даты начала.");
+
+        var now = _clock.UtcNow;
+        var cert = new MedicalCertificate
+        {
+            // Студента берём из скана, а не из формы — нельзя оформить справку чужому студенту.
+            StudentId = scan.StudentId,
+            StartDate = request.StartDate,
+            EndDate = request.EndDate,
+            IssueDate = request.IssueDate,
+            HealthGroup = request.HealthGroup,
+            PhysicalGroup = request.PhysicalGroup,
+            Restrictions = request.Restrictions,
+            Comment = request.Comment,
+            CertificateNumber = request.CertificateNumber,
+            MedicalOrganization = request.MedicalOrganization,
+            // Источник — загрузка студента; факт подтверждён медработником (человеком) → Verified.
+            Source = DraftSource.StudentUpload,
+            VerificationStatus = VerificationStatus.Verified,
+            VerifiedByUserId = _user.UserId,
+            VerifiedAt = now,
+            CreatedByUserId = _user.UserId,
+            UpdatedByUserId = _user.UserId,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        _db.Certificates.Add(cert);
+
+        scan.CertificateId = cert.Id;
+        scan.UpdatedAt = now;
+
+        _db.AuditLogs.Add(AuditEntryFactory.Create(
+            _user, _clock, nameof(MedicalCertificate), cert.Id, "Create",
+            $"Справка создана из скана {scan.Id:N} студента {scan.StudentId:N} " +
+            $"({request.StartDate:dd.MM.yyyy}–{request.EndDate:dd.MM.yyyy}), подтверждена медработником"));
+
+        await _db.SaveChangesAsync(cancellationToken);
+        return cert.Id;
+    }
 
     public async Task<ScanContent?> OpenAsync(Guid scanId, CancellationToken cancellationToken = default)
     {
