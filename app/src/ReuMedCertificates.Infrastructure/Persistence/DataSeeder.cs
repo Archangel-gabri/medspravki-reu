@@ -64,6 +64,18 @@ public static class DataSeeder
             await EnsureDemoUserAsync(userMgr, "admin", "Администратор (демо)", AppRoles.Admin);
 
             await SeedDemoDataAsync(db);
+            // Демо-студент-пользователь, привязанный к карточке Иванова (роль Student → свой допуск).
+            var ivanovStudent = await db.Students.FirstOrDefaultAsync(s => s.FullName == "Иванов Иван Сергеевич");
+            if (ivanovStudent is not null)
+            {
+                await EnsureDemoUserAsync(userMgr, "student", "Иванов Иван Сергеевич (студент)", AppRoles.Student);
+                var su = await userMgr.FindByNameAsync("student");
+                if (su is not null && su.StudentId != ivanovStudent.Id)
+                {
+                    su.StudentId = ivanovStudent.Id;
+                    await userMgr.UpdateAsync(su);
+                }
+            }
             await SeedReviewQueueDemoAsync(db);
             await SeedAuditDemoAsync(db);
             await SeedOnecDemoTableAsync(db);
@@ -285,6 +297,10 @@ public static class DataSeeder
         // RecognitionJson хранит шифртекст (P1 MED-A02) — тип колонки text, а не jsonb. Идемпотентно.
         await db.Database.ExecuteSqlRawAsync(
             @"ALTER TABLE certificate_scans ALTER COLUMN ""RecognitionJson"" TYPE text USING ""RecognitionJson""::text;");
+
+        // Связь аккаунта со студентом (роль Student видит свой допуск). Идемпотентно.
+        await db.Database.ExecuteSqlRawAsync(
+            @"ALTER TABLE ""AspNetUsers"" ADD COLUMN IF NOT EXISTS ""StudentId"" uuid;");
     }
 
     /// <summary>Создаёт демо-пользователя (если нет) и приводит его роли РОВНО к одной нужной (минимизация прав).</summary>

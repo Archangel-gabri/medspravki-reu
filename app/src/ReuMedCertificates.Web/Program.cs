@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -22,17 +23,23 @@ builder.Host.UseSerilog((context, services, configuration) =>
 
 builder.Services.AddRazorPages(options =>
 {
-    // Все страницы — только для сотрудников с ролью (не «любой вошедший»); вход/ошибка — анонимны.
-    options.Conventions.AuthorizeFolder("/", "StaffOnly");
+    // Вход/ошибка — анонимны. Остальное закрыто FallbackPolicy (любая страница требует входа),
+    // а доступ по ролям задаётся явно ниже — чтобы кабинет студента и разделы сотрудников не пересекались.
     options.Conventions.AllowAnonymousToPage("/Auth/Login");
     options.Conventions.AllowAnonymousToPage("/Error");
-    // Журнал аудита и импорт реестра — только администратор/завкафедрой.
+    // Рабочие разделы сотрудников (физрук/завкаф/админ/медработник): реестр, «Перед парой», карточки, справки.
+    options.Conventions.AuthorizeFolder("/Registry", "StaffOnly");
+    options.Conventions.AuthorizeFolder("/BeforeClass", "StaffOnly");
+    options.Conventions.AuthorizeFolder("/Students", "StaffOnly");
+    options.Conventions.AuthorizeFolder("/Certificates", "StaffOnly");
     // Журнал аудита и импорт реестра — администрация (завкафедрой/админ), не физрук/медработник.
     options.Conventions.AuthorizePage("/Journal/Index", "AdminOrHead");
     options.Conventions.AuthorizePage("/Import/Index", "AdminOrHead");
     // Медданные (сканы, распознавание, подтверждение справки) — ТОЛЬКО медработник (152-ФЗ минимизация, 323-ФЗ).
     options.Conventions.AuthorizePage("/Review/Index", "Medical");
     options.Conventions.AuthorizeFolder("/Scans", "Medical");
+    // Личный кабинет студента — ТОЛЬКО роль Student (видит свой допуск, не чужие данные).
+    options.Conventions.AuthorizePage("/Me/Index", "StudentOnly");
 });
 
 // Ролевые политики — логичное разграничение по ролям (минимизация прав).
@@ -44,6 +51,10 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("AdminOrHead", p => p.RequireRole("HeadOfDepartment", "Admin"));
     // Медицинские данные/вердикт — только медработник (не админ — минимизация).
     options.AddPolicy("Medical", p => p.RequireRole("MedicalStaff"));
+    // Личный кабинет — только студент.
+    options.AddPolicy("StudentOnly", p => p.RequireRole("Student"));
+    // Безопасный дефолт: любая страница без явной политики всё равно требует входа (deny-by-default).
+    options.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build();
 });
 
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -95,7 +106,9 @@ app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapGet("/", () => Results.Redirect("/registry"));
+// Корень роутит по роли: студент — в свой кабинет, сотрудник — в реестр.
+app.MapGet("/", (HttpContext ctx) =>
+    Results.Redirect(ctx.User.IsInRole("Student") ? "/me" : "/registry"));
 
 // Просмотр скана/PDF справки. Доступ только сотрудникам (роли), НЕ студентам — разграничение 152-ФЗ.
 // Безопасность: серверный MIME, no-store, inline-просмотр под nosniff (анти-XSS), аудит просмотра (РСБ/323-ФЗ).

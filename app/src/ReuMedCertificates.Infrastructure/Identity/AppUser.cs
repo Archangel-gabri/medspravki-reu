@@ -6,6 +6,10 @@ namespace ReuMedCertificates.Infrastructure.Identity;
 public class AppUser : IdentityUser<Guid>
 {
     public string FullName { get; set; } = string.Empty;
+
+    /// <summary>Привязка аккаунта к карточке студента (для роли Student — свой допуск). null для сотрудников.</summary>
+    public Guid? StudentId { get; set; }
+
     public bool IsActive { get; set; } = true;
     public DateTime? LastLoginAt { get; set; }
     public DateTime CreatedAt { get; set; }

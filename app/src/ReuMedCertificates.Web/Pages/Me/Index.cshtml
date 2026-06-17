@@ -1,0 +1,84 @@
+@page "/me"
+@model ReuMedCertificates.Web.Pages.Me.IndexModel
+@{
+    ViewData["Title"] = "Моя справка";
+    var s = Model.Student;
+}
+
+<div class="page-head">
+    <div>
+        <h1>Моя справка</h1>
+        @if (s is not null)
+        {
+            <p>@s.FullName · @s.Department · @s.Course курс · группа @s.Group</p>
+        }
+    </div>
+</div>
+
+@if (Model.NotLinked || s is null)
+{
+    <div class="card">
+        <div class="empty">
+            Ваш аккаунт пока не привязан к карточке студента. Обратитесь к преподавателю
+            физической культуры или в деканат — они свяжут учётную запись с вашими данными.
+        </div>
+    </div>
+}
+else
+{
+    <div class="cards">
+        <div class="card">
+            <h2>Текущий допуск</h2>
+            @if (s.Current.Count == 0)
+            {
+                <div class="empty">
+                    Действующей медицинской справки нет. Принесите справку (форма 086/у)
+                    преподавателю физической культуры — он внесёт её в систему.
+                </div>
+            }
+            else
+            {
+                foreach (var c in s.Current)
+                {
+                    var cls = StatusDisplay.CertClass(c.Status);
+                    <div class="row-status @cls" style="border-left-width:4px; padding-left:12px; margin-bottom:14px">
+                        <span class="badge @cls"><span class="dot"></span>@StatusDisplay.CertText(c.Status)</span>
+                        <dl class="kv" style="margin-top:10px">
+                            <dt>Срок действия</dt><dd>@c.StartDate.ToString("dd.MM.yyyy") – @c.EndDate.ToString("dd.MM.yyyy")</dd>
+                            <dt>Физкультурная группа</dt><dd>@StatusDisplay.PhysicalGroup(c.PhysicalGroup)</dd>
+                            <dt>Ограничения</dt><dd>@(string.IsNullOrWhiteSpace(c.Restrictions) ? "—" : c.Restrictions)</dd>
+                            <dt>Справка №</dt><dd>@(c.CertificateNumber ?? "—")</dd>
+                            <dt>Мед. организация</dt><dd>@(c.MedicalOrganization ?? "—")</dd>
+                            <dt>Статус проверки</dt><dd><span class="pill">@StatusDisplay.Verification(c.VerificationStatus)</span></dd>
+                        </dl>
+                    </div>
+                }
+            }
+            <p class="note">Если данные неверны — сообщите преподавателю физической культуры. Изменения вносит только сотрудник кафедры.</p>
+        </div>
+
+        @if (s.History.Count > 0)
+        {
+            <div class="card">
+                <h2>История справок</h2>
+                <div class="table-wrap">
+                    <table class="grid">
+                        <thead><tr><th>Срок</th><th>Физ. группа</th><th>Ограничения</th><th>Статус</th></tr></thead>
+                        <tbody>
+                        @foreach (var c in s.History)
+                        {
+                            var cls = StatusDisplay.CertClass(c.Status);
+                            <tr class="row-status @cls">
+                                <td class="dim">@c.StartDate.ToString("dd.MM.yyyy") – @c.EndDate.ToString("dd.MM.yyyy")</td>
+                                <td>@StatusDisplay.PhysicalGroup(c.PhysicalGroup)</td>
+                                <td class="dim">@(string.IsNullOrWhiteSpace(c.Restrictions) ? "—" : c.Restrictions)</td>
+                                <td><span class="badge @cls"><span class="dot"></span>@StatusDisplay.CertText(c.Status)</span></td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+    </div>
+}

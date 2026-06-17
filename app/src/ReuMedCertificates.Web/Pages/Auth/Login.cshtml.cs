@@ -44,7 +44,7 @@ public class LoginModel : PageModel
     public IActionResult OnGet(string? returnUrl = null)
     {
         if (User.Identity?.IsAuthenticated == true)
-            return LocalRedirect("/registry");
+            return LocalRedirect(User.IsInRole("Student") ? "/me" : "/registry");
         return Page();
     }
 
@@ -66,7 +66,11 @@ public class LoginModel : PageModel
                 await _userManager.UpdateAsync(user);
             }
             await AuditAsync("Login", $"Успешный вход: {Input.Login}", ip);
-            return LocalRedirect(returnUrl ?? "/registry");
+            if (!string.IsNullOrEmpty(returnUrl))
+                return LocalRedirect(returnUrl);
+            // Студент попадает в свой кабинет, сотрудник — в реестр.
+            var isStudent = user is not null && await _userManager.IsInRoleAsync(user, "Student");
+            return LocalRedirect(isStudent ? "/me" : "/registry");
         }
 
         await AuditAsync("LoginFailed",
