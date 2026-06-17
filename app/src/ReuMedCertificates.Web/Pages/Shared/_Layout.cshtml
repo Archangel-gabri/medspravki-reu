@@ -37,13 +37,13 @@
                 <span>Кафедра физической культуры</span>
             </div>
             <div class="es-user">
-                <div>
-                    <div class="es-user__name">@userName</div>
-                    <div class="es-user__role">@roleLabel</div>
-                </div>
+                <a class="es-user__name" href="@home" title="@roleLabel">
+                    <svg class="es-user__ava" width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm0 1.4c-3.1 0-5.6 1.6-5.6 3.7V14h11.2v-.9c0-2.1-2.5-3.7-5.6-3.7Z"/></svg>
+                    <span>@userName</span>
+                </a>
                 <form method="post" action="/Auth/Logout" class="logout-form">
                     @Html.AntiForgeryToken()
-                    <button type="submit" class="btn btn-sm">Выйти</button>
+                    <button type="submit" class="logout-link">Выйти</button>
                 </form>
             </div>
         </div>

@@ -2,6 +2,7 @@
 @model ReuMedCertificates.Web.Pages.Scans.IndexModel
 @{
     ViewData["Title"] = "Сканы справки";
+    bool isMedic = User.IsInRole("MedicalStaff");
 }
 
 <div class="page-head">
@@ -43,7 +44,7 @@ else
                 </div>
                 <div style="display:flex; gap:8px">
                     <a class="btn btn-sm" href="/scans/@row.Item.Id/file" target="_blank">Открыть</a>
-                    @if (Model.AiEnabled)
+                    @if (Model.AiEnabled && isMedic)
                     {
                         <form method="post" asp-page-handler="Recognize" style="margin:0">
                             <input type="hidden" name="scanId" value="@row.Item.Id" />
@@ -76,6 +77,10 @@ else
             else if (row.Item.RejectionReason is not null)
             {
                 <p class="alert alert-warn" style="margin-top:12px">✗ Заявка отклонена: @row.Item.RejectionReason</p>
+            }
+            else if (!isMedic)
+            {
+                <p class="note" style="margin-top:12px">Заявка на проверке у медработника — создание и отклонение справки выполняет медработник.</p>
             }
             else
             {

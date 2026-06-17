@@ -52,10 +52,14 @@ a:hover { text-decoration: underline; }
 .es-logo-sub { border-left: 1px solid var(--line); padding-left: 18px; line-height: 1.25; }
 .es-logo-sub strong { display: block; color: var(--navy-deep); font-size: 16px; font-weight: 700; }
 .es-logo-sub span { color: var(--muted-ink); font-size: 12px; }
-.es-user { margin-left: auto; display: flex; align-items: center; gap: 14px; }
-.es-user__name { color: var(--ink); font-size: 14px; font-weight: 700; }
-.es-user__role { color: var(--muted-ink); font-size: 12px; }
+/* Юзер-блок как у РЭУ: аватар-иконка + имя-ссылка (#398FCC, подчёркнута) + «Выйти» текстовой ссылкой. */
+.es-user { margin-left: auto; display: flex; align-items: center; gap: 20px; }
+.es-user__name { display: inline-flex; align-items: center; gap: 7px; color: #398fcc; font-size: 15px; font-weight: 400; text-decoration: underline; }
+.es-user__name:hover { color: #2f7bb0; text-decoration: underline; }
+.es-user__ava { color: #6b6b6b; flex: 0 0 auto; }
 .logout-form { margin: 0; }
+.logout-link { background: none; border: 0; padding: 0; color: #398fcc; font-size: 15px; font-family: inherit; line-height: 1; cursor: pointer; }
+.logout-link:hover { text-decoration: underline; color: #2f7bb0; }
 
 /* ---------- Синий навбар / хлебные крошки ---------- */
 .bluemenu { background: var(--navy); color: #fff; }

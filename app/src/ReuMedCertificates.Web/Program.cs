@@ -35,9 +35,11 @@ builder.Services.AddRazorPages(options =>
     // Журнал аудита и импорт реестра — администрация (завкафедрой/админ), не физрук/медработник.
     options.Conventions.AuthorizePage("/Journal/Index", "AdminOrHead");
     options.Conventions.AuthorizePage("/Import/Index", "AdminOrHead");
-    // Медданные (сканы, распознавание, очередь заявок, подтверждение справки) — ТОЛЬКО медработник (152-ФЗ, 323-ФЗ).
+    // Очередь заявок и подтверждение справки (медвердикт по 323-ФЗ) — ТОЛЬКО медработник.
     options.Conventions.AuthorizeFolder("/Review", "Medical");
-    options.Conventions.AuthorizeFolder("/Scans", "Medical");
+    // Просмотр сканов/справок — любой сотрудник (физрук тоже видит справки); обработку сканов
+    // (распознавание/создание/отклонение) в самой странице ограничиваем медработником.
+    options.Conventions.AuthorizeFolder("/Scans", "StaffOnly");
     // Личный кабинет студента — ТОЛЬКО роль Student (видит свой допуск, не чужие данные).
     options.Conventions.AuthorizePage("/Me/Index", "StudentOnly");
 });
@@ -110,7 +112,7 @@ app.UseAuthorization();
 app.MapGet("/", (HttpContext ctx) =>
     Results.Redirect(ctx.User.IsInRole("Student") ? "/me" : "/registry"));
 
-// Просмотр скана/PDF справки. Доступ только сотрудникам (роли), НЕ студентам — разграничение 152-ФЗ.
+// Просмотр скана/PDF справки. Доступ сотрудникам (физрук/медработник/админ/завкаф), НЕ студентам.
 // Безопасность: серверный MIME, no-store, inline-просмотр под nosniff (анти-XSS), аудит просмотра (РСБ/323-ФЗ).
 app.MapGet("/scans/{id:guid}/file", async (
     Guid id, HttpContext http, IScanService scans,
@@ -130,7 +132,7 @@ app.MapGet("/scans/{id:guid}/file", async (
     http.Response.Headers["Cache-Control"] = "no-store";
     http.Response.Headers["Content-Disposition"] = "inline";
     return Results.File(content.Stream, content.ContentType, enableRangeProcessing: true);
-}).RequireAuthorization(policy => policy.RequireRole("MedicalStaff"));
+}).RequireAuthorization(policy => policy.RequireRole("Teacher", "HeadOfDepartment", "Admin", "MedicalStaff"));
 
 app.MapRazorPages();
 
