@@ -15,8 +15,12 @@
     </div>
 </div>
 
-@if (!string.IsNullOrEmpty(Model.Message)) { <div class="alert alert-warn">@Model.Message</div> }
+@if (!string.IsNullOrEmpty(Model.Message)) { <div class="alert alert-success">@Model.Message</div> }
 @if (!string.IsNullOrEmpty(Model.ErrorMessage)) { <div class="alert alert-error">@Model.ErrorMessage</div> }
+@if (Model.MyScans.Count > 0 && Model.MyScans[0].RejectionReason is not null && Model.MyScans[0].CertificateId is null)
+{
+    <div class="alert alert-warn">Последняя заявка отклонена: «@Model.MyScans[0].RejectionReason». Исправьте замечание и загрузите справку заново ниже.</div>
+}
 
 @if (Model.NotLinked || s is null)
 {
@@ -115,11 +119,23 @@ else
                         <tbody>
                         @foreach (var sc in Model.MyScans)
                         {
-                            var processed = sc.CertificateId is not null;
                             <tr>
                                 <td>@sc.OriginalFileName</td>
                                 <td class="dim">@sc.UploadedAt.ToString("dd.MM.yyyy HH:mm")</td>
-                                <td><span class="pill">@(processed ? "Обработана" : "На проверке")</span></td>
+                                <td>
+                                    @if (sc.CertificateId is not null)
+                                    {
+                                        <span class="pill">Обработана</span>
+                                    }
+                                    else if (sc.RejectionReason is not null)
+                                    {
+                                        <span class="pill" style="color:#a94442; background:#f9eeee; border-color:#ebccd1">Отклонена: @sc.RejectionReason</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="pill">На проверке</span>
+                                    }
+                                </td>
                             </tr>
                         }
                         </tbody>

@@ -301,6 +301,12 @@ public static class DataSeeder
         // Связь аккаунта со студентом (роль Student видит свой допуск). Идемпотентно.
         await db.Database.ExecuteSqlRawAsync(
             @"ALTER TABLE ""AspNetUsers"" ADD COLUMN IF NOT EXISTS ""StudentId"" uuid;");
+
+        // Отклонение заявки-скана медработником (v2): причина + дата. Идемпотентно.
+        await db.Database.ExecuteSqlRawAsync(
+            @"ALTER TABLE certificate_scans ADD COLUMN IF NOT EXISTS ""RejectionReason"" text;");
+        await db.Database.ExecuteSqlRawAsync(
+            @"ALTER TABLE certificate_scans ADD COLUMN IF NOT EXISTS ""RejectedAt"" timestamptz;");
     }
 
     /// <summary>Создаёт демо-пользователя (если нет) и приводит его роли РОВНО к одной нужной (минимизация прав).</summary>

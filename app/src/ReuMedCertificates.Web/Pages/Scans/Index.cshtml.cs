@@ -106,6 +106,23 @@ public class IndexModel : PageModel
         return Page();
     }
 
+    // Медработник отклоняет заявку-скан с причиной → студент увидит её в кабинете.
+    public async Task<IActionResult> OnPostRejectScanAsync(Guid id, Guid scanId, string? reason, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _scans.RejectScanAsync(scanId, reason ?? string.Empty, cancellationToken);
+            Message = "Заявка отклонена. Студент увидит причину в личном кабинете.";
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+
+        await LoadAsync(id, cancellationToken);
+        return Page();
+    }
+
     private async Task<bool> LoadAsync(Guid id, CancellationToken cancellationToken)
     {
         var student = await _students.GetDetailAsync(id, cancellationToken);

@@ -69,7 +69,15 @@ else
                 <p class="note">⚠ Это черновик ИИ-предзаполнения, НЕ источник истины. Проверьте и подтвердите каждое поле.</p>
             }
 
-            @if (row.Item.CertificateId is null)
+            @if (row.Item.CertificateId is not null)
+            {
+                <p class="note" style="margin-top:12px">✓ По этому скану справка уже создана и подтверждена.</p>
+            }
+            else if (row.Item.RejectionReason is not null)
+            {
+                <p class="alert alert-warn" style="margin-top:12px">✗ Заявка отклонена: @row.Item.RejectionReason</p>
+            }
+            else
             {
                 <details style="margin-top:12px">
                     <summary style="cursor:pointer; color:#1F5BA8; font-weight:600">Создать справку из этого скана</summary>
@@ -103,10 +111,11 @@ else
                         <p class="note">Поля вносит и подтверждает медработник — ИИ лишь подсказывает. После создания справка сразу становится действующим допуском студента.</p>
                     </form>
                 </details>
-            }
-            else
-            {
-                <p class="note" style="margin-top:12px">✓ По этому скану справка уже создана и подтверждена.</p>
+                <form method="post" asp-page-handler="RejectScan" style="margin-top:10px; display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+                    <input type="hidden" name="scanId" value="@row.Item.Id" />
+                    <input class="input" name="reason" placeholder="Причина отклонения (увидит студент)" style="flex:1; min-width:220px" required />
+                    <button type="submit" class="btn btn-sm btn-danger">Отклонить заявку</button>
+                </form>
             }
         </div>
     }

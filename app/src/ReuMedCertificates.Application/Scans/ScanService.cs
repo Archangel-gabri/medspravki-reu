@@ -12,7 +12,7 @@ public sealed record ScanUploadRequest(Guid StudentId, Stream Content, string Or
 
 public sealed record ScanListItem(
     Guid Id, string OriginalFileName, long SizeBytes, DateTime UploadedAt,
-    string RecognitionStatus, Guid? CertificateId);
+    string RecognitionStatus, Guid? CertificateId, string? RejectionReason);
 
 public sealed record ScanContent(Stream Stream, string ContentType, string OriginalFileName);
 
@@ -33,13 +33,16 @@ public interface IScanService
     Task<ScanDetail?> GetAsync(Guid scanId, CancellationToken cancellationToken = default);
     Task<RecognitionResult?> RecognizeAsync(Guid scanId, CancellationToken cancellationToken = default);
 
-    /// <summary>Очередь заявок студентов (сканы без созданной справки) — для медработника.</summary>
+    /// <summary>Очередь заявок студентов (сканы без созданной справки и не отклонённые) — для медработника.</summary>
     Task<IReadOnlyList<PendingScanItem>> ListPendingStudentScansAsync(CancellationToken cancellationToken = default);
     Task<int> CountPendingStudentScansAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Медработник создаёт подтверждённую справку по скану студента и связывает скан с ней.
     /// Студент берётся из скана (целостность), факт подтверждается человеком (Verified).</summary>
     Task<Guid> CreateCertificateFromScanAsync(Guid scanId, AddCertificateRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>Медработник отклоняет заявку-скан с обязательной причиной (студент увидит её в кабинете).</summary>
+    Task RejectScanAsync(Guid scanId, string reason, CancellationToken cancellationToken = default);
 }
 
 public sealed class ScanService : IScanService
@@ -95,12 +98,12 @@ public sealed class ScanService : IScanService
         await _db.Scans.AsNoTracking()
             .Where(s => s.StudentId == studentId)
             .OrderByDescending(s => s.CreatedAt)
-            .Select(s => new ScanListItem(s.Id, s.OriginalFileName, s.SizeBytes, s.CreatedAt, s.RecognitionStatus, s.CertificateId))
+            .Select(s => new ScanListItem(s.Id, s.OriginalFileName, s.SizeBytes, s.CreatedAt, s.RecognitionStatus, s.CertificateId, s.RejectionReason))
             .ToListAsync(cancellationToken);
 
     public async Task<IReadOnlyList<PendingScanItem>> ListPendingStudentScansAsync(CancellationToken cancellationToken = default) =>
         await _db.Scans.AsNoTracking()
-            .Where(s => s.CertificateId == null && s.Source == DraftSource.StudentUpload)
+            .Where(s => s.CertificateId == null && s.RejectionReason == null && s.Source == DraftSource.StudentUpload)
             .OrderBy(s => s.CreatedAt)
             .Select(s => new PendingScanItem(
                 s.Id, s.StudentId, s.Student!.FullName, s.Student.StudyGroup!.Name,
@@ -109,7 +112,7 @@ public sealed class ScanService : IScanService
 
     public async Task<int> CountPendingStudentScansAsync(CancellationToken cancellationToken = default) =>
         await _db.Scans.AsNoTracking()
-            .CountAsync(s => s.CertificateId == null && s.Source == DraftSource.StudentUpload, cancellationToken);
+            .CountAsync(s => s.CertificateId == null && s.RejectionReason == null && s.Source == DraftSource.StudentUpload, cancellationToken);
 
     public async Task<Guid> CreateCertificateFromScanAsync(Guid scanId, AddCertificateRequest request, CancellationToken cancellationToken = default)
     {
@@ -147,6 +150,8 @@ public sealed class ScanService : IScanService
         _db.Certificates.Add(cert);
 
         scan.CertificateId = cert.Id;
+        scan.RejectionReason = null;   // если скан был отклонён, создание справки снимает отклонение
+        scan.RejectedAt = null;
         scan.UpdatedAt = now;
 
         _db.AuditLogs.Add(AuditEntryFactory.Create(
@@ -156,6 +161,28 @@ public sealed class ScanService : IScanService
 
         await _db.SaveChangesAsync(cancellationToken);
         return cert.Id;
+    }
+
+    public async Task RejectScanAsync(Guid scanId, string reason, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+            throw new InvalidOperationException("Укажите причину отклонения.");
+
+        var scan = await _db.Scans.FirstOrDefaultAsync(s => s.Id == scanId, cancellationToken)
+            ?? throw new InvalidOperationException("Скан не найден.");
+        if (scan.CertificateId is not null)
+            throw new InvalidOperationException("По скану уже создана справка — отклонить нельзя.");
+
+        var now = _clock.UtcNow;
+        scan.RejectionReason = reason.Trim();
+        scan.RejectedAt = now;
+        scan.UpdatedAt = now;
+
+        _db.AuditLogs.Add(AuditEntryFactory.Create(
+            _user, _clock, nameof(CertificateScan), scan.Id, "ScanRejected",
+            $"Заявка-скан студента {scan.StudentId:N} отклонена: {reason.Trim()}"));
+
+        await _db.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<ScanContent?> OpenAsync(Guid scanId, CancellationToken cancellationToken = default)
