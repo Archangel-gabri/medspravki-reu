@@ -2,14 +2,16 @@
    (1С-Битрикс, шаблон reapay_bootstrap_personal): PT Sans, тёмно-синий #0B2D50,
    чёрная верхняя плашка, белый контент, чёрный футер + статус-светофор допусков. */
 :root {
-    --navy: #0B2D50;        /* синий навбар bluemenu */
-    --navy-deep: #002953;   /* заголовки */
+    --navy: #0B2D50;        /* синий навбар bluemenu / ссылки */
+    --navy-deep: #002953;   /* заголовки h1 */
+    --btn-navy: #0B2D4F;    /* заливка кнопки .es-btn-blue */
+    --btn-border: #D9DEE2;  /* светлый бордер кнопки РЭУ */
     --indigo: #1E2856;      /* логотип / акценты */
     --topbar: #18202B;      /* верхняя тёмная плашка */
     --footer: #18202B;
     --ink: #333333;
     --muted-ink: #6b6b6b;
-    --line: #e2e6ea;
+    --line: #d9dee2;        /* бордеры таблиц/карточек (как у РЭУ) */
     --line-soft: #eef1f4;
     --surface: #ffffff;
     --tint: #eef2f7;        /* лёгкий синий тон для шапок таблиц/фильтров */
@@ -17,7 +19,8 @@
     --warn: #c77a00;
     --danger: #c9342e;
     --muted: #9aa3ad;
-    --radius: 3px;
+    --radius: 3px;          /* карточки/таблицы — мягкое скругление */
+    --btn-radius: 5px;      /* кнопки РЭУ */
 }
 
 * { box-sizing: border-box; }
@@ -31,8 +34,8 @@ body {
 a { color: var(--navy); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
-/* Геометрия как у портала РЭУ: узкий центрированный контейнер Bootstrap-3 (1170px), gutter 20px. */
-.container { width: 100%; max-width: 1170px; margin: 0 auto; padding: 0 20px; }
+/* Геометрия как у портала РЭУ (замер student.rea.ru): центрированный контейнер 980px, gutter 20px. */
+.container { width: 100%; max-width: 980px; margin: 0 auto; padding: 0 20px; }
 
 /* ---------- Верхняя чёрная плашка ---------- */
 .top-black-menu { background: var(--topbar); color: #fff; font-size: 13px; }
@@ -55,7 +58,7 @@ a:hover { text-decoration: underline; }
 
 /* ---------- Синий навбар / хлебные крошки ---------- */
 .bluemenu { background: var(--navy); color: #fff; }
-.bluemenu .container { display: flex; align-items: center; min-height: 50px; }
+.bluemenu .container { display: flex; align-items: center; min-height: 41px; padding-top: 8px; padding-bottom: 8px; }
 .crumbs { list-style: none; margin: 0; padding: 0; display: flex; gap: 8px; align-items: center; font-size: 13px; }
 .crumbs li { display: flex; gap: 8px; align-items: center; }
 .crumbs li + li::before { content: "›"; color: rgba(255,255,255,.6); }
@@ -83,16 +86,17 @@ a:hover { text-decoration: underline; }
 /* ---------- Кнопки ---------- */
 .btn {
     display: inline-flex; align-items: center; gap: 6px;
-    padding: 7px 14px; border-radius: var(--radius); border: 1px solid var(--line);
-    background: #fff; color: var(--ink); font-size: 13px; cursor: pointer;
-    font-family: inherit; line-height: 1.2;
+    padding: 6px 14px; border-radius: var(--btn-radius); border: 1px solid var(--btn-border);
+    background: #fff; color: var(--navy); font-size: 14px; cursor: pointer;
+    font-family: inherit; line-height: 1.25;
 }
-.btn:hover { border-color: #c2cad2; text-decoration: none; background: #fafbfc; }
-.btn-primary { background: var(--navy); border-color: var(--navy); color: #fff; }
-.btn-primary:hover { background: var(--navy-deep); border-color: var(--navy-deep); color: #fff; }
+.btn:hover { border-color: #c2cad2; text-decoration: none; background: #f5f7f9; }
+/* Основная кнопка РЭУ (.es-btn-blue): тёмно-синяя заливка + светлый хайрлайн-бордер. */
+.btn-primary { background: var(--btn-navy); border-color: var(--btn-border); color: #fff; }
+.btn-primary:hover { background: #07223c; border-color: var(--btn-border); color: #fff; }
 .btn-ghost { border-color: transparent; background: transparent; color: var(--muted-ink); }
 .btn-ghost:hover { background: var(--tint); color: var(--navy); }
-.btn-sm { padding: 4px 10px; font-size: 12.5px; }
+.btn-sm { padding: 3px 10px; font-size: 13px; }
 
 /* ---------- Фильтры ---------- */
 .filters {
@@ -102,8 +106,9 @@ a:hover { text-decoration: underline; }
 }
 .field { display: flex; flex-direction: column; gap: 4px; }
 .field label { font-size: 12px; color: var(--muted-ink); }
+/* Поля ввода РЭУ — плоские (без скругления), хайрлайн-бордер. */
 .input, select.input {
-    padding: 7px 10px; border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 7px 10px; border: 1px solid #c4ccd4; border-radius: 0;
     background: #fff; font-size: 13px; color: var(--ink); font-family: inherit; min-width: 150px;
 }
 .input:focus, select.input:focus { outline: none; border-color: var(--navy); box-shadow: 0 0 0 2px rgba(11,45,80,.12); }
@@ -112,12 +117,13 @@ a:hover { text-decoration: underline; }
 /* ---------- Таблица реестра ---------- */
 .table-wrap { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow-x: auto; }
 table.grid { width: 100%; border-collapse: collapse; min-width: 720px; }
+/* Шапка таблицы как у РЭУ/Bootstrap 3: обычный регистр, жирный, без капса. */
 table.grid thead th {
-    text-align: left; font-size: 11.5px; text-transform: uppercase; letter-spacing: .4px;
-    color: var(--navy-deep); font-weight: 700; padding: 10px 12px;
-    background: var(--tint); border-bottom: 2px solid var(--navy);
+    text-align: left; font-size: 13px;
+    color: var(--navy-deep); font-weight: 700; padding: 8px 12px;
+    background: var(--tint); border-bottom: 2px solid var(--line);
 }
-table.grid tbody td { padding: 9px 12px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; font-size: 13px; }
+table.grid tbody td { padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; font-size: 13px; }
 table.grid tbody tr:last-child td { border-bottom: none; }
 table.grid tbody tr:hover { background: #f6f9fc; }
 /* строки реестра — без цветных полос (строгий вид) */
