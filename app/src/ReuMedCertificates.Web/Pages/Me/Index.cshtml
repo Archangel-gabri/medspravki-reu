@@ -15,6 +15,9 @@
     </div>
 </div>
 
+@if (!string.IsNullOrEmpty(Model.Message)) { <div class="alert alert-warn">@Model.Message</div> }
+@if (!string.IsNullOrEmpty(Model.ErrorMessage)) { <div class="alert alert-error">@Model.ErrorMessage</div> }
+
 @if (Model.NotLinked || s is null)
 {
     <div class="card">
@@ -80,5 +83,50 @@ else
                 </div>
             </div>
         }
+    </div>
+
+    <div class="cards">
+        <div class="card">
+            <h2>Загрузить справку на проверку</h2>
+            <p>Сфотографируйте или отсканируйте медицинскую справку (форма 086/у) — PDF, JPG или PNG, до @Model.MaxUploadMb МБ. Её проверит медработник кафедры и оформит ваш допуск.</p>
+            <form method="post" asp-page-handler="Upload" enctype="multipart/form-data">
+                <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:10px 0">
+                    <input class="input" type="file" name="file" accept="application/pdf,image/jpeg,image/png" required />
+                    <button type="submit" class="btn btn-primary">Отправить на проверку</button>
+                </div>
+                <label style="display:flex; gap:8px; align-items:flex-start; cursor:pointer">
+                    <input type="checkbox" name="consent" value="true" />
+                    <span class="note" style="margin:0">Даю согласие на обработку моих медицинских данных (спецкатегория ПДн, 152-ФЗ) для допуска к занятиям физической культурой. Данные обрабатываются локально в РЭУ и во внешние сервисы не передаются.</span>
+                </label>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2>Мои заявки</h2>
+            @if (Model.MyScans.Count == 0)
+            {
+                <div class="empty">Вы пока не загружали справок.</div>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table class="grid">
+                        <thead><tr><th>Файл</th><th>Загружена</th><th>Статус</th></tr></thead>
+                        <tbody>
+                        @foreach (var sc in Model.MyScans)
+                        {
+                            var processed = sc.CertificateId is not null;
+                            <tr>
+                                <td>@sc.OriginalFileName</td>
+                                <td class="dim">@sc.UploadedAt.ToString("dd.MM.yyyy HH:mm")</td>
+                                <td><span class="pill">@(processed ? "Обработана" : "На проверке")</span></td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+                <p class="note">Медицинское содержимое справки видит только медработник кафедры. Результат проверки появляется в карточке допуска выше.</p>
+            }
+        </div>
     </div>
 }
