@@ -19,8 +19,9 @@
     --warn: #c77a00;
     --danger: #c9342e;
     --muted: #9aa3ad;
-    --radius: 3px;          /* карточки/таблицы — мягкое скругление */
-    --btn-radius: 5px;      /* кнопки РЭУ */
+    --radius: 4px;          /* карточки/таблицы (Bootstrap 3 РЭУ) */
+    --btn-radius: 4px;      /* кнопки РЭУ */
+    --btn-shadow: 0 6px 10px 0 #f5f8fa;  /* тонкая светлая тень кнопок/панелей РЭУ */
 }
 
 * { box-sizing: border-box; }
@@ -83,20 +84,32 @@ a:hover { text-decoration: underline; }
 .page-head p { margin: 0; color: var(--muted-ink); font-size: 13px; }
 .head-actions { display: flex; gap: 8px; }
 
-/* ---------- Кнопки ---------- */
+/* ---------- Кнопки (система РЭУ / Bootstrap 3) ----------
+   Признаки портала: min-width 140px, центрированный текст, тонкая светлая тень, radius 4px.
+   База = белый default; варианты ниже с точными цветами и hover как на student.rea.ru. */
 .btn {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 6px 14px; border-radius: var(--btn-radius); border: 1px solid var(--btn-border);
-    background: #fff; color: var(--navy); font-size: 14px; cursor: pointer;
-    font-family: inherit; line-height: 1.25;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    min-width: 140px; padding: 7px 12px; border-radius: var(--btn-radius);
+    border: 1px solid var(--btn-border); background: #fff; color: var(--ink);
+    font-size: 14px; line-height: 1.42857; font-weight: 400; cursor: pointer;
+    font-family: inherit; text-align: center; white-space: nowrap; box-shadow: var(--btn-shadow);
 }
-.btn:hover { border-color: #c2cad2; text-decoration: none; background: #f5f7f9; }
-/* Основная кнопка РЭУ (.es-btn-blue): тёмно-синяя заливка + светлый хайрлайн-бордер. */
-.btn-primary { background: var(--btn-navy); border-color: var(--btn-border); color: #fff; }
-.btn-primary:hover { background: #07223c; border-color: var(--btn-border); color: #fff; }
-.btn-ghost { border-color: transparent; background: transparent; color: var(--muted-ink); }
+.btn:hover, .btn:focus { text-decoration: none; color: var(--ink); background: #f5f8fa; border-color: var(--btn-border); }
+.btn:active { box-shadow: inset 0 3px 5px rgba(0,0,0,.125); }
+/* Основная (btn-primary РЭУ): тёмно-синяя, hover СВЕТЛЕЕТ до #286090 (как у портала). */
+.btn-primary { background: var(--navy); border-color: var(--navy); color: #fff; }
+.btn-primary:hover, .btn-primary:focus { background: #286090; border-color: #204d74; color: #fff; }
+.btn-success { background: #5cb85c; border-color: #4cae4c; color: #fff; }
+.btn-success:hover, .btn-success:focus { background: #449d44; border-color: #398439; color: #fff; }
+.btn-danger { background: #d9534f; border-color: #d43f3a; color: #fff; }
+.btn-danger:hover, .btn-danger:focus { background: #c9302c; border-color: #ac2925; color: #fff; }
+.btn-light { background: #f5f8fa; border-color: var(--btn-border); color: #18202b; }
+.btn-light:hover, .btn-light:focus { background: #ecf3f7; border-color: var(--btn-border); color: #18202b; }
+.btn-link { min-width: 0; border-color: transparent; background: transparent; color: var(--navy); box-shadow: none; }
+.btn-link:hover, .btn-link:focus { background: transparent; border-color: transparent; color: #23527c; text-decoration: underline; }
+.btn-ghost { min-width: 0; border-color: transparent; background: transparent; color: var(--muted-ink); box-shadow: none; }
 .btn-ghost:hover { background: var(--tint); color: var(--navy); }
-.btn-sm { padding: 3px 10px; font-size: 13px; }
+.btn-sm { min-width: 0; padding: 5px 10px; font-size: 13px; border-radius: 3px; box-shadow: none; }
 
 /* ---------- Фильтры ---------- */
 .filters {
@@ -106,26 +119,25 @@ a:hover { text-decoration: underline; }
 }
 .field { display: flex; flex-direction: column; gap: 4px; }
 .field label { font-size: 12px; color: var(--muted-ink); }
-/* Поля ввода РЭУ — плоские (без скругления), хайрлайн-бордер. */
+/* Поля ввода = .form-control РЭУ: высота 36px, светлый бордер, radius 4px, мягкое свечение фокуса. */
 .input, select.input {
-    padding: 7px 10px; border: 1px solid #c4ccd4; border-radius: 0;
-    background: #fff; font-size: 13px; color: var(--ink); font-family: inherit; min-width: 150px;
+    padding: 6px 12px; border: 1px solid var(--btn-border); border-radius: 4px;
+    background: #fff; font-size: 14px; color: #555; font-family: inherit; min-width: 150px; line-height: 1.42857;
 }
-.input:focus, select.input:focus { outline: none; border-color: var(--navy); box-shadow: 0 0 0 2px rgba(11,45,80,.12); }
+.input:focus, select.input:focus { outline: none; border-color: var(--btn-border); box-shadow: 0 0 8px rgba(217,222,226,.7); }
 .input-grow { min-width: 240px; }
 
 /* ---------- Таблица реестра ---------- */
 .table-wrap { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow-x: auto; }
-table.grid { width: 100%; border-collapse: collapse; min-width: 720px; }
-/* Шапка таблицы как у РЭУ/Bootstrap 3: обычный регистр, жирный, без капса. */
+/* Таблица = .table РЭУ (Bootstrap 3): шапка без фона, border-top на ячейках, hover строки #f5f5f5. */
+table.grid { width: 100%; border-collapse: collapse; min-width: 720px; background: #fff; }
 table.grid thead th {
-    text-align: left; font-size: 13px;
+    text-align: left; font-size: 13px; vertical-align: bottom;
     color: var(--navy-deep); font-weight: 700; padding: 8px 12px;
-    background: var(--tint); border-bottom: 2px solid var(--line);
+    border-bottom: 2px solid var(--line);
 }
-table.grid tbody td { padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; font-size: 13px; }
-table.grid tbody tr:last-child td { border-bottom: none; }
-table.grid tbody tr:hover { background: #f6f9fc; }
+table.grid tbody td { padding: 8px 12px; border-top: 1px solid var(--line); vertical-align: middle; font-size: 13px; line-height: 1.42857; }
+table.grid tbody tr:hover { background: #f5f5f5; }
 /* строки реестра — без цветных полос (строгий вид) */
 .row-status { }
 .name-cell { font-weight: 700; }
@@ -143,7 +155,7 @@ table.grid tbody tr:hover { background: #f6f9fc; }
 .badge.danger .dot { background: #b23a30; }
 .badge.danger { color: #a5342b; }
 .pill {
-    display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11.5px;
+    display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 11.5px;
     background: var(--tint); color: var(--navy-deep); border: 1px solid var(--line);
 }
 
@@ -153,8 +165,9 @@ table.grid tbody tr:hover { background: #f6f9fc; }
 /* ---------- Карточки / формы ---------- */
 .cards { display: grid; grid-template-columns: 1.1fr 1.4fr; gap: 16px; align-items: start; }
 @media (max-width: 980px) { .cards { grid-template-columns: 1fr; } }
-.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
-.card h2 { margin: 0 0 12px; font-size: 16px; color: var(--navy-deep); font-weight: 700; }
+/* Карточка = .panel РЭУ: radius 4px, тонкая светлая тень, заголовок 18px. */
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--btn-shadow); }
+.card h2 { margin: 0 0 12px; font-size: 18px; color: var(--navy-deep); font-weight: 700; }
 .kv { display: grid; grid-template-columns: 160px 1fr; row-gap: 8px; column-gap: 12px; }
 .kv dt { color: var(--muted-ink); font-size: 13px; }
 .kv dd { margin: 0; }
@@ -162,9 +175,11 @@ table.grid tbody tr:hover { background: #f6f9fc; }
 .form-grid .full { grid-column: 1 / -1; }
 .form-actions { display: flex; gap: 8px; margin-top: 16px; }
 textarea.input { min-height: 70px; resize: vertical; width: 100%; }
-.alert { padding: 10px 12px; border-radius: var(--radius); font-size: 13px; margin-bottom: 12px; }
-.alert-warn { background: #fff6e5; border: 1px solid #f0d08a; color: #8a5a00; }
-.alert-error { background: #fcedec; border: 1px solid #e8b4b1; color: #9a2620; }
+/* Алерты = .alert РЭУ (Bootstrap 3) — точные цвета. */
+.alert { padding: 12px 15px; border-radius: 4px; font-size: 13px; margin-bottom: 14px; border: 1px solid transparent; }
+.alert-success { background: #dff0d8; border-color: #d6e9c6; color: #3c763d; }
+.alert-warn { background: #fcf8e3; border-color: #faebcc; color: #8a6d3b; }
+.alert-error { background: #f2dede; border-color: #ebccd1; color: #a94442; }
 .empty { padding: 28px; text-align: center; color: var(--muted-ink); }
 .note { font-size: 12px; color: var(--muted-ink); margin-top: 6px; }
 
