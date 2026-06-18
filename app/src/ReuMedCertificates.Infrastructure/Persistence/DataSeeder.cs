@@ -309,11 +309,17 @@ public static class DataSeeder
         await db.Database.ExecuteSqlRawAsync(
             @"ALTER TABLE ""AspNetUsers"" ADD COLUMN IF NOT EXISTS ""StudentId"" uuid;");
 
-        // Отклонение заявки-скана медработником (v2): причина + дата. Идемпотентно.
+        // Отклонение заявки-скана (v2): причина + дата. Идемпотентно.
         await db.Database.ExecuteSqlRawAsync(
             @"ALTER TABLE certificate_scans ADD COLUMN IF NOT EXISTS ""RejectionReason"" text;");
         await db.Database.ExecuteSqlRawAsync(
             @"ALTER TABLE certificate_scans ADD COLUMN IF NOT EXISTS ""RejectedAt"" timestamptz;");
+
+        // Срок действия, указанный студентом при загрузке (v2). Идемпотентно.
+        await db.Database.ExecuteSqlRawAsync(
+            @"ALTER TABLE certificate_scans ADD COLUMN IF NOT EXISTS ""ProposedStartDate"" date;");
+        await db.Database.ExecuteSqlRawAsync(
+            @"ALTER TABLE certificate_scans ADD COLUMN IF NOT EXISTS ""ProposedEndDate"" date;");
     }
 
     /// <summary>Создаёт демо-пользователя (если нет) и приводит его роли РОВНО к одной нужной (минимизация прав).</summary>

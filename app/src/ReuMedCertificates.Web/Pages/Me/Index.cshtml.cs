@@ -46,7 +46,8 @@ public class IndexModel : PageModel
         return Page();
     }
 
-    public async Task<IActionResult> OnPostUploadAsync(IFormFile? file, bool consent, CancellationToken cancellationToken)
+    public async Task<IActionResult> OnPostUploadAsync(
+        IFormFile? file, DateOnly? startDate, DateOnly? endDate, CancellationToken cancellationToken)
     {
         var studentId = await ResolveStudentIdAsync();
         if (studentId is null)
@@ -55,9 +56,7 @@ public class IndexModel : PageModel
             return Page();
         }
 
-        if (!consent)
-            ErrorMessage = "Поставьте отметку о согласии на обработку медицинских данных.";
-        else if (file is null || file.Length == 0)
+        if (file is null || file.Length == 0)
             ErrorMessage = "Файл не выбран.";
         else if (file.Length > _scanOptions.MaxUploadBytes)
             ErrorMessage = $"Файл больше {MaxUploadMb} МБ.";
@@ -65,13 +64,17 @@ public class IndexModel : PageModel
             ErrorMessage = $"Недопустимый тип файла ({file.ContentType}). Разрешено: PDF, JPG, PNG.";
         else if (!await HasAllowedSignatureAsync(file, cancellationToken))
             ErrorMessage = "Файл не прошёл проверку сигнатуры — это не PDF/JPG/PNG.";
+        else if (startDate is null || endDate is null)
+            ErrorMessage = "Укажите срок действия справки (Действует с / по).";
+        else if (endDate < startDate)
+            ErrorMessage = "Дата окончания не может быть раньше даты начала.";
         else
         {
             await using var stream = file.OpenReadStream();
             await _scans.UploadAsync(
-                new ScanUploadRequest(studentId.Value, stream, Path.GetFileName(file.FileName), file.ContentType),
+                new ScanUploadRequest(studentId.Value, stream, Path.GetFileName(file.FileName), file.ContentType, startDate, endDate),
                 cancellationToken);
-            Message = "Справка загружена и отправлена на проверку. Результат появится в карточке допуска.";
+            Message = "Справка отправлена на проверку преподавателю. Результат появится в таблице ниже.";
         }
 
         await LoadAsync(cancellationToken);

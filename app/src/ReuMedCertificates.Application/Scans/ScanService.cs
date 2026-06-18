@@ -8,11 +8,15 @@ using ReuMedCertificates.Domain.Enums;
 
 namespace ReuMedCertificates.Application.Scans;
 
-public sealed record ScanUploadRequest(Guid StudentId, Stream Content, string OriginalFileName, string ContentType);
+public sealed record ScanUploadRequest(
+    Guid StudentId, Stream Content, string OriginalFileName, string ContentType,
+    DateOnly? StartDate = null, DateOnly? EndDate = null);
 
 public sealed record ScanListItem(
     Guid Id, string OriginalFileName, long SizeBytes, DateTime UploadedAt,
-    string RecognitionStatus, Guid? CertificateId, string? RejectionReason);
+    string RecognitionStatus, Guid? CertificateId, string? RejectionReason,
+    DateOnly? ProposedStartDate, DateOnly? ProposedEndDate,
+    DateOnly? CertStartDate, DateOnly? CertEndDate);
 
 public sealed record ScanContent(Stream Stream, string ContentType, string OriginalFileName);
 
@@ -81,6 +85,8 @@ public sealed class ScanService : IScanService
             Source = DraftSource.StudentUpload,
             UploadedByUserId = _user.UserId,
             RecognitionStatus = "None",
+            ProposedStartDate = request.StartDate,
+            ProposedEndDate = request.EndDate,
             CreatedAt = _clock.UtcNow,
             UpdatedAt = _clock.UtcNow
         };
@@ -98,7 +104,11 @@ public sealed class ScanService : IScanService
         await _db.Scans.AsNoTracking()
             .Where(s => s.StudentId == studentId)
             .OrderByDescending(s => s.CreatedAt)
-            .Select(s => new ScanListItem(s.Id, s.OriginalFileName, s.SizeBytes, s.CreatedAt, s.RecognitionStatus, s.CertificateId, s.RejectionReason))
+            .Select(s => new ScanListItem(
+                s.Id, s.OriginalFileName, s.SizeBytes, s.CreatedAt, s.RecognitionStatus, s.CertificateId, s.RejectionReason,
+                s.ProposedStartDate, s.ProposedEndDate,
+                s.Certificate == null ? (DateOnly?)null : s.Certificate.StartDate,
+                s.Certificate == null ? (DateOnly?)null : s.Certificate.EndDate))
             .ToListAsync(cancellationToken);
 
     public async Task<IReadOnlyList<PendingScanItem>> ListPendingStudentScansAsync(CancellationToken cancellationToken = default) =>

@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Identity;
+using ReuMedCertificates.Infrastructure.Identity;
 using ReuMedCertificates.Application.Abstractions;
 using ReuMedCertificates.Application.Common;
 using ReuMedCertificates.Application.Scans;
@@ -130,6 +132,24 @@ app.MapGet("/scans/{id:guid}/file", async (
     http.Response.Headers["Content-Disposition"] = "inline";
     return Results.File(content.Stream, content.ContentType, enableRangeProcessing: true);
 }).RequireAuthorization(policy => policy.RequireRole("Teacher", "HeadOfDepartment", "Admin"));
+
+// Студент смотрит ТОЛЬКО свой загруженный файл (проверка владения по AppUser.StudentId).
+app.MapGet("/me/scans/{id:guid}/file", async (
+    Guid id, HttpContext http, IScanService scans, UserManager<AppUser> users, CancellationToken ct) =>
+{
+    var user = await users.GetUserAsync(http.User);
+    if (user?.StudentId is not { } studentId) return Results.Forbid();
+
+    var detail = await scans.GetAsync(id, ct);
+    if (detail is null || detail.StudentId != studentId) return Results.NotFound();
+
+    var content = await scans.OpenAsync(id, ct);
+    if (content is null) return Results.NotFound();
+
+    http.Response.Headers["Cache-Control"] = "no-store";
+    http.Response.Headers["Content-Disposition"] = "inline";
+    return Results.File(content.Stream, content.ContentType, enableRangeProcessing: true);
+}).RequireAuthorization("StudentOnly");
 
 app.MapRazorPages();
 

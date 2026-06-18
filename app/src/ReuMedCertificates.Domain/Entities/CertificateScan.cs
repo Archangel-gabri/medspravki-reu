@@ -38,8 +38,12 @@ public class CertificateScan : BaseEntity
     public string? RecognitionModel { get; set; }
     public DateTime? RecognizedAt { get; set; }
 
-    // --- Отклонение заявки медработником (v2): скан без справки и без причины = «на проверке». ---
+    // --- Отклонение заявки преподавателем (v2): скан без справки и без причины = «на проверке». ---
     /// <summary>Причина отклонения заявки студента; заполнена → заявка отклонена.</summary>
     public string? RejectionReason { get; set; }
     public DateTime? RejectedAt { get; set; }
+
+    // --- Срок действия, указанный студентом при загрузке (преподаватель подтверждает/правит). ---
+    public DateOnly? ProposedStartDate { get; set; }
+    public DateOnly? ProposedEndDate { get; set; }
 }

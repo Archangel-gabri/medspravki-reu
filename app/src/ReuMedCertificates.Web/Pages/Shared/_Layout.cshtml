@@ -64,7 +64,17 @@
             <ul>
                 @if (isStudent)
                 {
-                    <li class="@active("/me")"><a href="/me">Моя справка</a></li>
+                    <li class="disabled"><span>Личные данные</span></li>
+                    <li class="disabled"><span>Электронная зачётная книжка</span></li>
+                    <li class="@active("/me")"><a href="/me">Справки</a></li>
+                    <li class="disabled"><span>Воинский учёт</span></li>
+                    <li class="disabled"><span>Заявления</span></li>
+                    <li class="disabled"><span>Расписание</span></li>
+                    <li class="disabled"><span>Обращения</span></li>
+                    <li class="disabled"><span>Объявления</span></li>
+                    <li class="disabled"><span>Рейтинг</span></li>
+                    <li class="disabled"><span>Портфолио и антиплагиат</span></li>
+                    <li class="disabled"><span>Настройки уведомлений</span></li>
                 }
                 else
                 {
