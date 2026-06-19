@@ -1,7 +1,7 @@
 @{
     var path = (Context.Request.Path.Value ?? "/").ToLowerInvariant();
     string active(string prefix) => path.StartsWith(prefix) ? "active" : "";
-    var userName = User.Identity?.Name ?? "—";
+    var userName = User.FindFirst("FullName")?.Value ?? User.Identity?.Name ?? "—";
     var title = ViewData["Title"] as string ?? "";
     var roleLabel = User.IsInRole("Admin") ? "Администратор"
         : User.IsInRole("HeadOfDepartment") ? "Зав. кафедрой"

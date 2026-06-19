@@ -39,6 +39,7 @@ public static class DependencyInjection
                 options.User.RequireUniqueEmail = false;
             })
             .AddEntityFrameworkStores<ApplicationDbContext>()
+            .AddClaimsPrincipalFactory<AppUserClaimsPrincipalFactory>()
             .AddDefaultTokenProviders();
 
         services.ConfigureApplicationCookie(options =>

@@ -66,16 +66,16 @@ public static class DataSeeder
         {
             // Демо-пользователи СТРОГО по одной роли (логичное разграничение прав).
             var userMgr = sp.GetRequiredService<UserManager<AppUser>>();
-            await EnsureDemoUserAsync(userMgr, "teacher", "Преподаватель (демо)", AppRoles.Teacher);
-            await EnsureDemoUserAsync(userMgr, "head", "Зав. кафедрой (демо)", AppRoles.HeadOfDepartment);
-            await EnsureDemoUserAsync(userMgr, "admin", "Администратор (демо)", AppRoles.Admin);
+            await EnsureDemoUserAsync(userMgr, "teacher", "Преподаватель 57", AppRoles.Teacher);
+            await EnsureDemoUserAsync(userMgr, "head", "Преподаватель 01", AppRoles.HeadOfDepartment);
+            await EnsureDemoUserAsync(userMgr, "admin", "Администратор системы", AppRoles.Admin);
 
             await SeedDemoDataAsync(db);
             // Демо-студент-пользователь, привязанный к карточке Иванова (роль Student → свой допуск).
             var ivanovStudent = await db.Students.FirstOrDefaultAsync(s => s.FullName == "Иванов Иван Сергеевич");
             if (ivanovStudent is not null)
             {
-                await EnsureDemoUserAsync(userMgr, "student", "Иванов Иван Сергеевич (студент)", AppRoles.Student);
+                await EnsureDemoUserAsync(userMgr, "student", "Иванов Иван Сергеевич", AppRoles.Student);
                 var su = await userMgr.FindByNameAsync("student");
                 if (su is not null && su.StudentId != ivanovStudent.Id)
                 {
@@ -335,6 +335,13 @@ public static class DataSeeder
                 FullName = fullName, IsActive = true, CreatedAt = now, UpdatedAt = now
             };
             if (!(await um.CreateAsync(user, "<демо-пароль>")).Succeeded) return;
+        }
+        // Держим ФИО актуальным (показывается в шапке как в ЛК РЭУ).
+        if (user.FullName != fullName)
+        {
+            user.FullName = fullName;
+            user.UpdatedAt = DateTime.UtcNow;
+            await um.UpdateAsync(user);
         }
         var current = await um.GetRolesAsync(user);
         var extra = current.Where(r => r != role).ToList();

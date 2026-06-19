@@ -58,24 +58,23 @@ else
 
         <div class="card">
             <h2>Отправить справку</h2>
-            <form method="post" asp-page-handler="Upload" enctype="multipart/form-data">
+            <form id="upform" method="post" asp-page-handler="Upload" enctype="multipart/form-data">
                 <label class="fld">
                     <span>Файл справки (PDF, JPG, PNG)</span>
-                    <input class="input" type="file" name="file" accept="application/pdf,image/jpeg,image/png" required />
+                    <input id="upfile" class="input" type="file" name="file" accept="application/pdf,image/jpeg,image/png" required />
                 </label>
-                <div class="fld-row">
-                    <label class="fld">
-                        <span>Действует с</span>
-                        <input class="input" type="date" name="startDate" value="@today.ToString("yyyy-MM-dd")" required />
-                    </label>
-                    <label class="fld">
-                        <span>Действует по</span>
-                        <input class="input" type="date" name="endDate" value="@today.AddDays(180).ToString("yyyy-MM-dd")" required />
-                    </label>
-                </div>
-                <button type="submit" class="btn btn-primary" style="margin-top:14px">Отправить на проверку</button>
-                <p class="note">После отправки справку прочитает ИИ и проверит фамилию, печать и срок, а финальное решение примет преподаватель. Отправляя файл, вы даёте согласие на обработку медицинских данных (152-ФЗ) в периметре РЭУ.</p>
+                <button type="submit" id="upbtn" class="btn btn-primary" style="margin-top:14px">Отправить на проверку</button>
+                <p class="note">Срок действия, группу здоровья, тип справки и наличие печати/подписи распознаёт ИИ — вводить вручную ничего не нужно. Финальное решение принимает преподаватель. Отправляя файл, вы даёте согласие на обработку медицинских данных (152-ФЗ) в периметре РЭУ.</p>
             </form>
+            <script>
+                (function () {
+                    var f = document.getElementById('upform');
+                    if (!f) return;
+                    var b = document.getElementById('upbtn'), fi = document.getElementById('upfile');
+                    f.addEventListener('submit', function () { b.disabled = true; b.textContent = 'Отправляем…'; });
+                    fi.addEventListener('change', function () { b.disabled = false; b.textContent = 'Отправить на проверку'; });
+                })();
+            </script>
         </div>
     </div>
 

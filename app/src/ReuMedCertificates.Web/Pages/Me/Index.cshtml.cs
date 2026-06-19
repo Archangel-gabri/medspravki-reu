@@ -46,8 +46,7 @@ public class IndexModel : PageModel
         return Page();
     }
 
-    public async Task<IActionResult> OnPostUploadAsync(
-        IFormFile? file, DateOnly? startDate, DateOnly? endDate, CancellationToken cancellationToken)
+    public async Task<IActionResult> OnPostUploadAsync(IFormFile? file, CancellationToken cancellationToken)
     {
         var studentId = await ResolveStudentIdAsync();
         if (studentId is null)
@@ -64,17 +63,14 @@ public class IndexModel : PageModel
             ErrorMessage = $"Недопустимый тип файла ({file.ContentType}). Разрешено: PDF, JPG, PNG.";
         else if (!await HasAllowedSignatureAsync(file, cancellationToken))
             ErrorMessage = "Файл не прошёл проверку сигнатуры — это не PDF/JPG/PNG.";
-        else if (startDate is null || endDate is null)
-            ErrorMessage = "Укажите срок действия справки (Действует с / по).";
-        else if (endDate < startDate)
-            ErrorMessage = "Дата окончания не может быть раньше даты начала.";
         else
         {
             await using var stream = file.OpenReadStream();
+            // Срок/группу/тип/подлинность распознаёт ИИ — студент даты не вводит.
             await _scans.UploadAsync(
-                new ScanUploadRequest(studentId.Value, stream, Path.GetFileName(file.FileName), file.ContentType, startDate, endDate),
+                new ScanUploadRequest(studentId.Value, stream, Path.GetFileName(file.FileName), file.ContentType),
                 cancellationToken);
-            Message = "Справка отправлена на проверку преподавателю. Результат появится в таблице ниже.";
+            Message = "Справка отправлена на проверку. ИИ распознаёт её, результат появится в таблице ниже.";
         }
 
         await LoadAsync(cancellationToken);
