@@ -33,6 +33,7 @@ public sealed class CertificateService : ICertificateService
             IssueDate = request.IssueDate,
             HealthGroup = request.HealthGroup,
             PhysicalGroup = request.PhysicalGroup,
+            Type = request.Type,
             Restrictions = request.Restrictions,
             Comment = request.Comment,
             CertificateNumber = request.CertificateNumber,
@@ -122,6 +123,29 @@ public sealed class CertificateService : ICertificateService
         _db.AuditLogs.Add(AuditEntryFactory.Create(
             _user, _clock, nameof(MedicalCertificate), cert.Id, "Reject",
             $"Справка отклонена: {reason.Trim()}"));
+
+        await _db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task RevokeAsync(Guid certificateId, string reason, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+            throw new InvalidOperationException("Укажите причину отзыва.");
+
+        var cert = await _db.Certificates.FirstOrDefaultAsync(c => c.Id == certificateId && !c.IsDeleted, cancellationToken)
+            ?? throw new InvalidOperationException("Справка не найдена.");
+        if (cert.VerificationStatus != VerificationStatus.Verified)
+            throw new InvalidOperationException("Отозвать можно только действующую (подтверждённую) справку.");
+
+        var now = _clock.UtcNow;
+        cert.VerificationStatus = VerificationStatus.Revoked;
+        cert.RejectionReason = reason.Trim();
+        cert.UpdatedByUserId = _user.UserId;
+        cert.UpdatedAt = now;
+
+        _db.AuditLogs.Add(AuditEntryFactory.Create(
+            _user, _clock, nameof(MedicalCertificate), cert.Id, "Revoke",
+            $"Допуск отозван: {reason.Trim()}"));
 
         await _db.SaveChangesAsync(cancellationToken);
     }

@@ -3,6 +3,18 @@
 @{
     ViewData["Title"] = "Сканы справки";
 }
+@functions {
+    static string RecStatus(string s) => s switch
+    {
+        "Processing" => "ИИ проверяет…",
+        "AutoApproved" => "ИИ: допуск выдан автоматически",
+        "NeedsReview" => "Нужна ручная проверка",
+        "Done" => "ИИ распознал",
+        "Failed" => "Ошибка распознавания",
+        "Skipped" => "ИИ не смог распознать",
+        _ => "Не распознавалось"
+    };
+}
 
 <div class="page-head">
     <div>
@@ -39,7 +51,11 @@ else
                 <div>
                     <strong>@row.Item.OriginalFileName</strong>
                     <span class="dim"> · @((row.Item.SizeBytes / 1024.0).ToString("0")) КБ · @row.Item.UploadedAt.ToString("dd.MM.yyyy HH:mm")</span>
-                    <div><span class="pill">Распознавание: @row.Item.RecognitionStatus</span></div>
+                    <div><span class="pill">@RecStatus(row.Item.RecognitionStatus)</span></div>
+                    @if (!string.IsNullOrWhiteSpace(row.Item.AiNotes))
+                    {
+                        <div class="note" style="margin-top:4px">@row.Item.AiNotes</div>
+                    }
                 </div>
                 <div style="display:flex; gap:8px">
                     <a class="btn btn-sm" href="/scans/@row.Item.Id/file" target="_blank">Открыть</a>
@@ -88,6 +104,14 @@ else
                             <label>Дата окончания<input class="input" type="date" name="endDate" required /></label>
                             <label>Дата выдачи<input class="input" type="date" name="issueDate" /></label>
                             <label>Справка №<input class="input" name="certificateNumber" /></label>
+                            <label>Тип справки
+                                <select class="input" name="type">
+                                    @foreach (var t in Enum.GetValues<CertificateType>())
+                                    {
+                                        <option value="@t">@StatusDisplay.CertType(t)</option>
+                                    }
+                                </select>
+                            </label>
                             <label>Физкультурная группа
                                 <select class="input" name="physicalGroup">
                                     @foreach (var pg in Enum.GetValues<PhysicalEducationGroup>())

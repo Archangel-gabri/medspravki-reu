@@ -5,6 +5,14 @@ namespace ReuMedCertificates.Web.Helpers;
 /// <summary>Человекочитаемые подписи и CSS-классы статусов/групп (всегда цвет + текст для дальтоников).</summary>
 public static class StatusDisplay
 {
+    public static string CertType(CertificateType type) => type switch
+    {
+        CertificateType.Standard086 => "086/у",
+        CertificateType.Pool => "Бассейн",
+        CertificateType.Exemption => "Освобождение",
+        _ => "Иная"
+    };
+
     public static string CertText(CertificateStatus? status) => status switch
     {
         null => "Нет справки",

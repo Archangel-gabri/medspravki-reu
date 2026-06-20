@@ -17,6 +17,9 @@
     </div>
 </div>
 
+@if (!string.IsNullOrEmpty(Model.Message)) { <div class="alert alert-success">@Model.Message</div> }
+@if (!string.IsNullOrEmpty(Model.ErrorMessage)) { <div class="alert alert-error">@Model.ErrorMessage</div> }
+
 <div class="cards">
     <div class="card">
         <h2>Данные студента</h2>
@@ -44,6 +47,7 @@
                 <div class="row-status @cls" style="border-left-width:4px; padding-left:12px; margin-bottom:14px">
                     <span class="badge @cls"><span class="dot"></span>@StatusDisplay.CertText(c.Status)</span>
                     <dl class="kv" style="margin-top:10px">
+                        <dt>Тип</dt><dd>@StatusDisplay.CertType(c.Type)</dd>
                         <dt>Срок действия</dt><dd>@c.StartDate.ToString("dd.MM.yyyy") – @c.EndDate.ToString("dd.MM.yyyy")</dd>
                         <dt>Физ. группа</dt><dd>@StatusDisplay.PhysicalGroup(c.PhysicalGroup)</dd>
                         <dt>Группа здоровья</dt><dd>@StatusDisplay.HealthGroup(c.HealthGroup)</dd>
@@ -52,6 +56,14 @@
                         <dt>Мед. организация</dt><dd>@(c.MedicalOrganization ?? "—")</dd>
                         <dt>Проверка</dt><dd><span class="pill">@StatusDisplay.Verification(c.VerificationStatus)</span></dd>
                     </dl>
+                    @if (c.VerificationStatus == VerificationStatus.Verified)
+                    {
+                        <form method="post" asp-page-handler="Revoke" style="margin-top:10px; display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+                            <input type="hidden" name="certificateId" value="@c.Id" />
+                            <input class="input" name="reason" placeholder="Причина отзыва допуска" style="flex:1; min-width:200px" required />
+                            <button type="submit" class="btn btn-sm btn-danger">Отозвать допуск</button>
+                        </form>
+                    }
                 </div>
             }
         }

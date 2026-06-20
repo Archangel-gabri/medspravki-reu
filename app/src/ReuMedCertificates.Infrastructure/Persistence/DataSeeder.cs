@@ -320,6 +320,12 @@ public static class DataSeeder
             @"ALTER TABLE certificate_scans ADD COLUMN IF NOT EXISTS ""ProposedStartDate"" date;");
         await db.Database.ExecuteSqlRawAsync(
             @"ALTER TABLE certificate_scans ADD COLUMN IF NOT EXISTS ""ProposedEndDate"" date;");
+
+        // Тип справки + итог авто-проверки ИИ (v2). Идемпотентно.
+        await db.Database.ExecuteSqlRawAsync(
+            @"ALTER TABLE medical_certificates ADD COLUMN IF NOT EXISTS ""Type"" integer NOT NULL DEFAULT 0;");
+        await db.Database.ExecuteSqlRawAsync(
+            @"ALTER TABLE certificate_scans ADD COLUMN IF NOT EXISTS ""AiNotes"" text;");
     }
 
     /// <summary>Создаёт демо-пользователя (если нет) и приводит его роли РОВНО к одной нужной (минимизация прав).</summary>

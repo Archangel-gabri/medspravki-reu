@@ -85,7 +85,7 @@ public class IndexModel : PageModel
     // Медработник подтверждает поля (human-in-the-loop, ФЗ-273) → создаётся справка из скана и связывается с ним.
     public async Task<IActionResult> OnPostCreateCertAsync(
         Guid id, Guid scanId, DateOnly startDate, DateOnly endDate, DateOnly? issueDate,
-        PhysicalEducationGroup physicalGroup, HealthGroup healthGroup,
+        PhysicalEducationGroup physicalGroup, HealthGroup healthGroup, CertificateType type,
         string? certificateNumber, string? medicalOrganization, string? restrictions,
         CancellationToken cancellationToken)
     {
@@ -93,7 +93,7 @@ public class IndexModel : PageModel
         {
             await _scans.CreateCertificateFromScanAsync(scanId,
                 new AddCertificateRequest(id, startDate, endDate, issueDate, healthGroup, physicalGroup,
-                    restrictions, null, certificateNumber, medicalOrganization),
+                    restrictions, null, certificateNumber, medicalOrganization, type),
                 cancellationToken);
             Message = "Справка создана из скана и подтверждена. Допуск студента обновлён.";
         }

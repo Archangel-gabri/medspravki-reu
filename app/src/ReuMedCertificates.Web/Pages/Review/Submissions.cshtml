@@ -3,6 +3,17 @@
 @{
     ViewData["Title"] = "Заявки студентов";
 }
+@functions {
+    static string RecStatus(string s) => s switch
+    {
+        "Processing" => "ИИ проверяет…",
+        "NeedsReview" => "Нужна ручная проверка",
+        "Failed" => "Ошибка распознавания",
+        "Skipped" => "ИИ не распознал",
+        "Done" => "ИИ распознал",
+        _ => "—"
+    };
+}
 
 <div class="page-head">
     <div>
@@ -29,7 +40,13 @@ else
                         <td class="dim">@it.Group</td>
                         <td>@it.OriginalFileName</td>
                         <td class="dim">@it.UploadedAt.ToString("dd.MM.yyyy HH:mm")</td>
-                        <td><span class="pill">@it.RecognitionStatus</span></td>
+                        <td>
+                            <span class="pill">@RecStatus(it.RecognitionStatus)</span>
+                            @if (!string.IsNullOrWhiteSpace(it.AiNotes))
+                            {
+                                <div class="note" style="margin-top:4px">@it.AiNotes</div>
+                            }
+                        </td>
                         <td><a class="btn btn-sm btn-primary" href="/students/@it.StudentId/scans">Обработать</a></td>
                     </tr>
                 }

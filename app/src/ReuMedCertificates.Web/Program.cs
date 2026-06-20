@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using ReuMedCertificates.Infrastructure.Identity;
+using ReuMedCertificates.Web.Services;
 using ReuMedCertificates.Application.Abstractions;
 using ReuMedCertificates.Application.Common;
 using ReuMedCertificates.Application.Scans;
@@ -59,6 +60,10 @@ builder.Services.AddAuthorization(options =>
 });
 
 builder.Services.AddInfrastructure(builder.Configuration);
+
+// Фоновая ИИ-проверка загруженных сканов (очередь + воркер) — загрузка возвращается сразу.
+builder.Services.AddSingleton<IScanProcessingQueue, ScanProcessingQueue>();
+builder.Services.AddHostedService<ScanProcessingBackgroundService>();
 
 // Шифрование спецкатегории ПДн at-rest (P1 MED-A02): ключи персистентны, чтобы расшифровывать после рестарта.
 builder.Services.AddDataProtection()

@@ -24,6 +24,9 @@ public class MedicalCertificate : BaseEntity
     public HealthGroup HealthGroup { get; set; } = HealthGroup.Unknown;
     public PhysicalEducationGroup PhysicalGroup { get; set; } = PhysicalEducationGroup.None;
 
+    /// <summary>Тип справки (086/у, бассейн, освобождение…).</summary>
+    public CertificateType Type { get; set; } = CertificateType.Standard086;
+
     /// <summary>Ограничения — функциональные формулировки, БЕЗ диагноза (152-ФЗ минимизация).</summary>
     public string? Restrictions { get; set; }
     public string? Comment { get; set; }

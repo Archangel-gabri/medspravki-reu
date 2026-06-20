@@ -109,6 +109,10 @@ else
                                 {
                                     <span class="pill" style="color:#a94442; background:#f9eeee; border-color:#ebccd1" title="@sc.RejectionReason">Отклонена</span>
                                 }
+                                else if (sc.RecognitionStatus == "Processing")
+                                {
+                                    <span class="pill">ИИ проверяет…</span>
+                                }
                                 else
                                 {
                                     <span class="pill">На проверке</span>

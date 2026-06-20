@@ -46,4 +46,7 @@ public class CertificateScan : BaseEntity
     // --- Срок действия, указанный студентом при загрузке (преподаватель подтверждает/правит). ---
     public DateOnly? ProposedStartDate { get; set; }
     public DateOnly? ProposedEndDate { get; set; }
+
+    /// <summary>Итог авто-проверки ИИ (что распознано / почему ушло на ручную проверку).</summary>
+    public string? AiNotes { get; set; }
 }

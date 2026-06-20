@@ -12,7 +12,8 @@ public sealed record AddCertificateRequest(
     string? Restrictions,
     string? Comment,
     string? CertificateNumber,
-    string? MedicalOrganization);
+    string? MedicalOrganization,
+    CertificateType Type = CertificateType.Standard086);
 
 /// <summary>Элемент очереди «На проверке» (неподтверждённая справка).</summary>
 public sealed record ReviewItem(
@@ -45,4 +46,7 @@ public interface ICertificateService
 
     /// <summary>Отклонить справку (NeedsReview → Rejected) с обязательной причиной.</summary>
     Task RejectAsync(Guid certificateId, string reason, CancellationToken cancellationToken = default);
+
+    /// <summary>Отозвать действующую справку (Verified → Revoked) с причиной — физрук снимает допуск.</summary>
+    Task RevokeAsync(Guid certificateId, string reason, CancellationToken cancellationToken = default);
 }
