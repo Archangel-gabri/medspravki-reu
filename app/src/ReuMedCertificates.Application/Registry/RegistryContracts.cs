@@ -21,6 +21,7 @@ public sealed record RegistryRow(
     string Group,
     string? Teacher,
     PhysicalEducationGroup PhysicalGroup,
+    HealthGroup HealthGroup,
     string? Restrictions,
     DateOnly? StartDate,
     DateOnly? EndDate,

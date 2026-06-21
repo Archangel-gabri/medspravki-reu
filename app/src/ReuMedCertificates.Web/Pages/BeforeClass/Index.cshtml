@@ -40,7 +40,7 @@ else
                 <tr>
                     <th>Студент</th>
                     <th>Статус</th>
-                    <th>Физ. группа</th>
+                    <th>Группа здоровья</th>
                     <th>Ограничения</th>
                     <th>Срок</th>
                 </tr>
@@ -61,7 +61,7 @@ else
                             <span class="badge @cls"><span class="dot"></span>@StatusDisplay.CertText(r.Status)</span>
                         }
                     </td>
-                    <td>@StatusDisplay.PhysicalGroup(r.PhysicalGroup)</td>
+                    <td>@(r.HealthGroup == HealthGroup.Unknown ? "—" : StatusDisplay.HealthGroup(r.HealthGroup))</td>
                     <td class="dim">@(string.IsNullOrWhiteSpace(r.Restrictions) ? "—" : r.Restrictions)</td>
                     <td class="dim">@(r.EndDate is null ? "—" : r.EndDate.Value.ToString("dd.MM.yyyy"))</td>
                 </tr>

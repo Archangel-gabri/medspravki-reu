@@ -77,7 +77,7 @@
                 <th>Курс</th>
                 <th>Группа</th>
                 <th>Преподаватель</th>
-                <th>Физ. группа</th>
+                <th>Группа здоровья</th>
                 <th>Срок справки</th>
                 <th>Статус</th>
             </tr>
@@ -96,7 +96,7 @@
                 <td>@r.Course</td>
                 <td>@r.Group</td>
                 <td class="dim">@(r.Teacher ?? "—")</td>
-                <td>@StatusDisplay.PhysicalGroup(r.PhysicalGroup)</td>
+                <td>@(r.HealthGroup == HealthGroup.Unknown ? "—" : StatusDisplay.HealthGroup(r.HealthGroup))</td>
                 <td class="dim">@(r.StartDate is null ? "—" : $"{r.StartDate:dd.MM.yyyy} – {r.EndDate:dd.MM.yyyy}")</td>
                 <td>
                     @if (r.Status is null && r.HasPendingReview)

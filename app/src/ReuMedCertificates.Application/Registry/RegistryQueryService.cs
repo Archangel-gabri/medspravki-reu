@@ -77,6 +77,7 @@ public sealed class RegistryQueryService : IRegistryQueryService
             x.Group,
             x.Teacher,
             x.Cert?.PhysicalGroup ?? PhysicalEducationGroup.None,
+            x.Cert?.HealthGroup ?? HealthGroup.Unknown,
             x.Cert?.Restrictions,
             x.Cert is null ? null : x.Cert.StartDate,
             x.Cert is null ? null : x.Cert.EndDate,
