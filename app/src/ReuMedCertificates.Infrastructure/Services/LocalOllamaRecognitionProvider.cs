@@ -25,11 +25,13 @@ public sealed class LocalOllamaRecognitionProvider : IDocumentRecognitionService
         ("issue_date", "Дата выдачи"),
         ("start_date", "Дата начала"),
         ("end_date", "Дата окончания"),
+        ("validity_months", "Действует, мес."),
         ("certificate_number", "Номер справки"),
         ("medical_organization", "Мед. организация"),
         ("physical_group", "Физкультурная группа"),
         ("health_group", "Группа здоровья"),
-        ("restrictions", "Ограничения"),
+        ("admitted", "Допуск (да/нет)"),
+        ("restrictions", "Заключение/ограничения"),
         ("has_stamp", "Печать обнаружена"),
         ("has_signature", "Подпись обнаружена"),
     };
@@ -73,16 +75,22 @@ public sealed class LocalOllamaRecognitionProvider : IDocumentRecognitionService
 
     private static string BuildPrompt() =>
         """
-        На изображении — российская медицинская справка о допуске к занятиям физической культурой
-        (например, форма 086/у). Извлеки данные и верни СТРОГО JSON с ключами:
-        full_name (ФИО студента), document_type (тип документа, напр. "086/у"),
-        issue_date, start_date, end_date (даты в формате ДД.ММ.ГГГГ или null),
-        certificate_number, medical_organization,
-        physical_group (одно из: "Основная","Подготовительная","Специальная А","Специальная Б","Освобождение", иначе null),
-        health_group (одно из: "I","II","III","IV","V", иначе null),
-        restrictions (текст ограничений без диагноза, иначе null),
-        has_stamp (true/false — видна ли печать), has_signature (true/false — видна ли подпись врача).
-        Если поле не читается — поставь null. Никакого текста кроме JSON.
+        Ты распознаёшь российскую медицинскую справку для допуска к физкультуре. Верни ТОЛЬКО JSON с ключами:
+        full_name: ФИО студента (поле «Фамилия, имя, отчество» / «Выдана гр. …»). Рукопись читай максимально внимательно.
+        document_type: одно из "086/у", "бассейн", "освобождение", иначе краткое описание.
+        issue_date: дата ВЫДАЧИ справки в ДД.ММ.ГГГГ, ТОЛЬКО если явно есть «выдана»/«дата выдачи».
+          НЕ бери дату рождения (после ФИО, «г.р.», «дата рождения») и НЕ дату лицензии/ОГРН/«от …». Сомневаешься — null.
+        validity_months: число месяцев, если написано «действительна N месяцев», иначе null.
+        start_date, end_date: явный срок «действует с … по …» в ДД.ММ.ГГГГ, иначе null.
+        certificate_number: номер справки (после «СПРАВКА №» / «МЕДИЦИНСКАЯ СПРАВКА №»). НЕ лицензия, НЕ ОГРН, НЕ ИНН.
+        medical_organization: название клиники.
+        physical_group: ТОЛЬКО если явно «физкультурная группа: …» или «основная/подготовительная/специальная медицинская группа».
+          Фраза «по группе А/Б» про бассейн — это НЕ физкультурная группа → null.
+        health_group: "I"/"II"/"III"/"IV"/"V" или null.
+        admitted: true если «допущен», false если «не допущен», иначе null.
+        restrictions: заключение/ограничения кратко, без диагноза.
+        has_stamp: true/false (есть ли печать), has_signature: true/false (есть ли подпись/росчерк врача).
+        Используй настоящий JSON null (без кавычек), не строку "null". Никакого текста кроме JSON.
         """;
 
     private static IReadOnlyList<RecognizedField> ParseFields(string json)
