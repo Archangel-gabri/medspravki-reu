@@ -308,8 +308,6 @@ public sealed class ScanService : IScanService
         var flags = new List<string>();
         if (!NameMatches(p.FullName, scan.Student?.FullName))
             flags.Add($"ФИО на справке не совпадает с вашим (распознано: «{p.FullName ?? "—"}»)");
-        if (!IsForReu(p.PlaceOfStudy))
-            flags.Add($"справка оформлена не для РЭУ (место учёбы: «{p.PlaceOfStudy ?? "—"}»)");
         if (p.FitForPe == false)
             flags.Add("по справке к физкультуре НЕ допущен");
         if (p.HasStamp != true)
@@ -326,7 +324,7 @@ public sealed class ScanService : IScanService
                 p.HealthGroup, p.PhysicalGroup, p.Restrictions, "Автопроверка ИИ",
                 p.CertNumber, p.Organization, p.Type), cancellationToken);
             scan.RecognitionStatus = "AutoApproved";
-            scan.AiNotes = $"ИИ: ФИО совпало, РЭУ, печать на месте; срок {start:dd.MM.yyyy}–{end:dd.MM.yyyy}, группа {p.PhysicalGroup}.";
+            scan.AiNotes = $"ИИ: ФИО совпало, печать на месте, допущен; срок {start:dd.MM.yyyy}–{end:dd.MM.yyyy}, группа {p.PhysicalGroup}.";
         }
         else
         {
@@ -431,13 +429,6 @@ public sealed class ScanService : IScanService
         if (rec.Count == 0 || prof.Count == 0) return false;
         var matched = prof.Count(pt => rec.Any(rt => Similar(pt, rt) >= 0.6));
         return matched >= Math.Min(2, prof.Count);
-    }
-
-    private static bool IsForReu(string? place)
-    {
-        if (string.IsNullOrWhiteSpace(place)) return false;
-        var v = place.ToLowerInvariant().Replace('ё', 'е');
-        return v.Contains("плеханов") || v.Contains("рэу") || v.Contains("российский экономический");
     }
 
     private static double Similar(string a, string b)
