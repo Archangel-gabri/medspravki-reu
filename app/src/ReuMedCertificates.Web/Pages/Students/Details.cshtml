@@ -49,8 +49,11 @@
                     <dl class="kv" style="margin-top:10px">
                         <dt>Тип</dt><dd>@StatusDisplay.CertType(c.Type)</dd>
                         <dt>Срок действия</dt><dd>@c.StartDate.ToString("dd.MM.yyyy") – @c.EndDate.ToString("dd.MM.yyyy")</dd>
-                        <dt>Физ. группа</dt><dd>@StatusDisplay.PhysicalGroup(c.PhysicalGroup)</dd>
-                        <dt>Группа здоровья</dt><dd>@StatusDisplay.HealthGroup(c.HealthGroup)</dd>
+                        <dt>Группа здоровья</dt><dd>@if (c.HealthGroup == HealthGroup.Unknown) { <text>не указана</text> } else { <strong>@StatusDisplay.HealthGroup(c.HealthGroup)</strong> <text>группа</text> }</dd>
+                        @if (c.PhysicalGroup != PhysicalEducationGroup.None)
+                        {
+                            <dt>Физкультурная группа</dt><dd>@StatusDisplay.PhysicalGroup(c.PhysicalGroup)</dd>
+                        }
                         <dt>Ограничения</dt><dd>@(string.IsNullOrWhiteSpace(c.Restrictions) ? "—" : c.Restrictions)</dd>
                         <dt>Справка №</dt><dd>@(c.CertificateNumber ?? "—")</dd>
                         <dt>Мед. организация</dt><dd>@(c.MedicalOrganization ?? "—")</dd>

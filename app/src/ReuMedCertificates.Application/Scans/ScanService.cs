@@ -386,15 +386,24 @@ public sealed class ScanService : IScanService
         return DateOnly.TryParseExact(s.Trim(), fmts, CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : null;
     }
 
-    private static HealthGroup MapHealth(string? s) => (s?.Trim().ToUpperInvariant()) switch
+    private static HealthGroup MapHealth(string? s)
     {
-        "I" or "1" => HealthGroup.I,
-        "II" or "2" => HealthGroup.II,
-        "III" or "3" => HealthGroup.III,
-        "IV" or "4" => HealthGroup.IV,
-        "V" or "5" => HealthGroup.V,
-        _ => HealthGroup.Unknown
-    };
+        var v = (s ?? "").Trim().ToUpperInvariant().Replace('Ё', 'Е');
+        if (v.Length == 0) return HealthGroup.Unknown;
+        // словами и арабскими цифрами
+        if (v.Contains("ПЯТ") || v.Contains("5")) return HealthGroup.V;
+        if (v.Contains("ЧЕТВ") || v.Contains("4")) return HealthGroup.IV;
+        if (v.Contains("ТРЕТ") || v.Contains("3")) return HealthGroup.III;
+        if (v.Contains("ВТОР") || v.Contains("2")) return HealthGroup.II;
+        if (v.Contains("ПЕРВ") || v.Contains("1")) return HealthGroup.I;
+        // римскими (длинные раньше коротких)
+        if (v.Contains("IV")) return HealthGroup.IV;
+        if (v.Contains("III")) return HealthGroup.III;
+        if (v.Contains("II")) return HealthGroup.II;
+        if (v.Contains("V")) return HealthGroup.V;
+        if (v.Contains("I")) return HealthGroup.I;
+        return HealthGroup.Unknown;
+    }
 
     private static PhysicalEducationGroup MapPhysical(string? s)
     {
