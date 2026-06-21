@@ -271,6 +271,7 @@ public sealed class ScanService : IScanService
         {
             scan.RecognitionStatus = "Failed";
             scan.RecognitionJson = _protector.Protect(JsonSerializer.Serialize(new { error = ex.Message }));
+            scan.AiNotes = "ОШИБКА: " + ex.Message;   // диагностика (видно в БД)
             scan.UpdatedAt = _clock.UtcNow;
             await _db.SaveChangesAsync(cancellationToken);
             return null;
@@ -293,29 +294,39 @@ public sealed class ScanService : IScanService
             scan.RecognitionStatus = "Rejected";
             scan.RejectionReason = "Справку не удалось распознать. Сфотографируйте чётче (чтобы было видно ФИО, печать, подпись и срок) и пришлите снова.";
             scan.RejectedAt = now;
-            scan.AiNotes = "ИИ не распознал документ.";
+            scan.AiNotes ??= "ИИ не распознал документ.";   // не затираем диагностику из RecognizeAsync
             scan.UpdatedAt = now;
             await _db.SaveChangesAsync(cancellationToken);
             return;
         }
 
         var p = ParseRecognized(rec.RawJson);
+        // Срок: явный «с–по», иначе «дата выдачи + N месяцев» (для 086/у обычно 6).
+        var start = p.StartDate ?? p.IssueDate;
+        var end = p.EndDate ?? (start.HasValue ? start.Value.AddMonths(p.ValidityMonths ?? 6) : (DateOnly?)null);
+
         var flags = new List<string>();
         if (!NameMatches(p.FullName, scan.Student?.FullName))
             flags.Add($"ФИО на справке не совпадает с вашим (распознано: «{p.FullName ?? "—"}»)");
-        if (p.HasStamp != true) flags.Add("не видно печати медучреждения");
-        if (p.HasSignature != true) flags.Add("не видно подписи врача");
-        if (p.StartDate is null || p.EndDate is null) flags.Add("не распознан срок действия");
-        else if (p.EndDate < p.StartDate) flags.Add("срок указан неверно (окончание раньше начала)");
+        if (!IsForReu(p.PlaceOfStudy))
+            flags.Add($"справка оформлена не для РЭУ (место учёбы: «{p.PlaceOfStudy ?? "—"}»)");
+        if (p.FitForPe == false)
+            flags.Add("по справке к физкультуре НЕ допущен");
+        if (p.HasStamp != true)
+            flags.Add("не видно печати медучреждения");
+        if (start is null || end is null)
+            flags.Add("не распознан срок действия");
+        else if (end < start)
+            flags.Add("срок указан неверно");
 
         if (flags.Count == 0)
         {
             await CreateCertificateFromScanAsync(scanId, new AddCertificateRequest(
-                scan.StudentId, p.StartDate!.Value, p.EndDate!.Value, p.IssueDate,
+                scan.StudentId, start!.Value, end!.Value, p.IssueDate,
                 p.HealthGroup, p.PhysicalGroup, p.Restrictions, "Автопроверка ИИ",
                 p.CertNumber, p.Organization, p.Type), cancellationToken);
             scan.RecognitionStatus = "AutoApproved";
-            scan.AiNotes = $"ИИ: ФИО совпало, печать и подпись на месте; срок {p.StartDate:dd.MM.yyyy}–{p.EndDate:dd.MM.yyyy}.";
+            scan.AiNotes = $"ИИ: ФИО совпало, РЭУ, печать на месте; срок {start:dd.MM.yyyy}–{end:dd.MM.yyyy}, группа {p.PhysicalGroup}.";
         }
         else
         {
@@ -330,9 +341,10 @@ public sealed class ScanService : IScanService
     }
 
     private sealed record Recognized(
-        string? FullName, DateOnly? StartDate, DateOnly? EndDate, DateOnly? IssueDate,
+        string? FullName, DateOnly? StartDate, DateOnly? EndDate, DateOnly? IssueDate, int? ValidityMonths,
         HealthGroup HealthGroup, PhysicalEducationGroup PhysicalGroup, CertificateType Type,
-        bool? HasStamp, bool? HasSignature, string? CertNumber, string? Organization, string? Restrictions);
+        bool? HasStamp, bool? HasSignature, bool? FitForPe, string? PlaceOfStudy,
+        string? CertNumber, string? Organization, string? Restrictions);
 
     private static Recognized ParseRecognized(string? rawJson)
     {
@@ -343,28 +355,36 @@ public sealed class ScanService : IScanService
             {
                 JsonValueKind.True => true,
                 JsonValueKind.False => false,
-                JsonValueKind.String => v.GetString()?.Trim().ToLowerInvariant() is "да" or "true" or "yes" or "есть",
+                JsonValueKind.String => v.GetString()?.Trim().ToLowerInvariant() is "да" or "true" or "yes" or "есть" or "годен" or "допущен",
                 _ => (bool?)null
             } : null;
+        static int? Intg(JsonElement r, string k)
+        {
+            if (!r.TryGetProperty(k, out var v)) return null;
+            if (v.ValueKind == JsonValueKind.Number && v.TryGetInt32(out var n)) return n;
+            if (v.ValueKind == JsonValueKind.String && int.TryParse(new string((v.GetString() ?? "").Where(char.IsDigit).ToArray()), out var m)) return m;
+            return null;
+        }
         try
         {
             using var doc = JsonDocument.Parse(string.IsNullOrWhiteSpace(rawJson) ? "{}" : rawJson);
             var r = doc.RootElement;
             return new Recognized(
-                Str(r, "full_name"), ParseDate(Str(r, "start_date")), ParseDate(Str(r, "end_date")), ParseDate(Str(r, "issue_date")),
+                Str(r, "full_name"), ParseDate(Str(r, "start_date")), ParseDate(Str(r, "end_date")), ParseDate(Str(r, "issue_date")), Intg(r, "validity_months"),
                 MapHealth(Str(r, "health_group")), MapPhysical(Str(r, "physical_group")), MapType(Str(r, "document_type")),
-                Bln(r, "has_stamp"), Bln(r, "has_signature"), Str(r, "certificate_number"), Str(r, "medical_organization"), Str(r, "restrictions"));
+                Bln(r, "has_stamp"), Bln(r, "has_signature"), Bln(r, "fit_for_pe"), Str(r, "place_of_study"),
+                Str(r, "certificate_number"), Str(r, "medical_organization"), Str(r, "restrictions"));
         }
         catch
         {
-            return new Recognized(null, null, null, null, HealthGroup.Unknown, PhysicalEducationGroup.None, CertificateType.Other, null, null, null, null, null);
+            return new Recognized(null, null, null, null, null, HealthGroup.Unknown, PhysicalEducationGroup.None, CertificateType.Other, null, null, null, null, null, null, null);
         }
     }
 
     private static DateOnly? ParseDate(string? s)
     {
         if (string.IsNullOrWhiteSpace(s)) return null;
-        string[] fmts = { "dd.MM.yyyy", "d.M.yyyy", "yyyy-MM-dd", "dd/MM/yyyy" };
+        string[] fmts = { "dd.MM.yyyy", "d.M.yyyy", "yyyy-MM-dd", "dd/MM/yyyy", "dd.MM.yy", "d.M.yy", "dd.M.yy", "d.MM.yy" };
         return DateOnly.TryParseExact(s.Trim(), fmts, CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : null;
     }
 
@@ -398,17 +418,45 @@ public sealed class ScanService : IScanService
         return CertificateType.Other;
     }
 
+    private static List<string> Toks(string? s) => (s ?? "").ToLowerInvariant().Replace('ё', 'е')
+        .Split(new[] { ' ', '\t', '\n', '\r', '.', ',' }, StringSplitOptions.RemoveEmptyEntries)
+        .Where(t => t.Length >= 2).ToList();
+
+    // Нечёткая сверка ФИО: рукопись ИИ читает приблизительно, поэтому сравниваем токены
+    // по похожести (Левенштейн). Нужно совпадение минимум двух токенов (фамилия+имя).
     private static bool NameMatches(string? recognized, string? profile)
     {
-        if (string.IsNullOrWhiteSpace(recognized) || string.IsNullOrWhiteSpace(profile)) return false;
-        static HashSet<string> Toks(string s) => s.ToLowerInvariant().Replace('ё', 'е')
-            .Split(new[] { ' ', '\t', '\n', '\r', '.', ',' }, StringSplitOptions.RemoveEmptyEntries)
-            .Where(t => t.Length >= 2).ToHashSet();
         var rec = Toks(recognized);
         var prof = Toks(profile);
         if (rec.Count == 0 || prof.Count == 0) return false;
-        // Совпадение, если меньшее множество токенов целиком входит в большее
-        // («Иванов Иван» ⊆ «Иванов Иван Сергеевич»).
-        return rec.Count <= prof.Count ? rec.IsSubsetOf(prof) : prof.IsSubsetOf(rec);
+        var matched = prof.Count(pt => rec.Any(rt => Similar(pt, rt) >= 0.6));
+        return matched >= Math.Min(2, prof.Count);
+    }
+
+    private static bool IsForReu(string? place)
+    {
+        if (string.IsNullOrWhiteSpace(place)) return false;
+        var v = place.ToLowerInvariant().Replace('ё', 'е');
+        return v.Contains("плеханов") || v.Contains("рэу") || v.Contains("российский экономический");
+    }
+
+    private static double Similar(string a, string b)
+    {
+        var m = Math.Max(a.Length, b.Length);
+        return m == 0 ? 1.0 : 1.0 - (double)Levenshtein(a, b) / m;
+    }
+
+    private static int Levenshtein(string a, string b)
+    {
+        var d = new int[a.Length + 1, b.Length + 1];
+        for (var i = 0; i <= a.Length; i++) d[i, 0] = i;
+        for (var j = 0; j <= b.Length; j++) d[0, j] = j;
+        for (var i = 1; i <= a.Length; i++)
+            for (var j = 1; j <= b.Length; j++)
+            {
+                var cost = a[i - 1] == b[j - 1] ? 0 : 1;
+                d[i, j] = Math.Min(Math.Min(d[i - 1, j] + 1, d[i, j - 1] + 1), d[i - 1, j - 1] + cost);
+            }
+        return d[a.Length, b.Length];
     }
 }

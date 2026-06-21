@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using ReuMedCertificates.Application.Abstractions;
@@ -22,6 +23,8 @@ public sealed class LocalOllamaRecognitionProvider : IDocumentRecognitionService
     {
         ("full_name", "ФИО"),
         ("document_type", "Тип документа"),
+        ("place_of_study", "Место учёбы"),
+        ("past_illnesses", "Перенесённые заболевания"),
         ("issue_date", "Дата выдачи"),
         ("start_date", "Дата начала"),
         ("end_date", "Дата окончания"),
@@ -30,7 +33,7 @@ public sealed class LocalOllamaRecognitionProvider : IDocumentRecognitionService
         ("medical_organization", "Мед. организация"),
         ("physical_group", "Физкультурная группа"),
         ("health_group", "Группа здоровья"),
-        ("admitted", "Допуск (да/нет)"),
+        ("fit_for_pe", "Годен к физкультуре"),
         ("restrictions", "Заключение/ограничения"),
         ("has_stamp", "Печать обнаружена"),
         ("has_signature", "Подпись обнаружена"),
@@ -46,23 +49,38 @@ public sealed class LocalOllamaRecognitionProvider : IDocumentRecognitionService
 
     public async Task<RecognitionResult> RecognizeAsync(ScanInput scan, CancellationToken cancellationToken = default)
     {
-        var imageBytes = scan.ContentType.Contains("pdf", StringComparison.OrdinalIgnoreCase)
-            ? await RenderPdfFirstPageAsync(scan.Content, cancellationToken)
-            : scan.Content;
+        // PDF → все страницы (двухсторонняя справка: лицо + оборот), фото → одно изображение.
+        var pages = scan.ContentType.Contains("pdf", StringComparison.OrdinalIgnoreCase)
+            ? await RenderPdfAllPagesAsync(scan.Content, cancellationToken)
+            : new List<byte[]> { scan.Content };
 
         var requestBody = new
         {
             model = _options.VisionModel,
             prompt = BuildPrompt(),
-            images = new[] { Convert.ToBase64String(imageBytes) },
+            images = pages.Select(Convert.ToBase64String).ToArray(),
             stream = false,
             format = "json",
-            options = new { temperature = 0 }
+            // num_ctx поднят: двухстраничная справка (2 изображения) + промпт не влезают в дефолтные 4096.
+            options = new { temperature = 0, num_ctx = 8192 }
         };
 
-        using var response = await _http.PostAsJsonAsync(
-            $"{_options.OllamaUrl.TrimEnd('/')}/api/generate", requestBody, cancellationToken);
-        response.EnsureSuccessStatusCode();
+        // Важно: отправляем буферизованным StringContent (с Content-Length), а не PostAsJsonAsync
+        // (тот шлёт chunked-потоком — Ollama отвечает 400 на multi-image запрос). Без Expect:100-continue.
+        var json = JsonSerializer.Serialize(requestBody);
+        using var content = new StringContent(json, Encoding.UTF8, "application/json");
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{_options.OllamaUrl.TrimEnd('/')}/api/generate")
+        {
+            Content = content
+        };
+        request.Headers.ExpectContinue = false;
+
+        using var response = await _http.SendAsync(request, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            var errBody = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new InvalidOperationException($"Ollama {(int)response.StatusCode}: {errBody}");
+        }
 
         var ollama = await response.Content.ReadFromJsonAsync<OllamaGenerateResponse>(cancellationToken);
         var rawJson = ollama?.Response ?? "{}";
@@ -75,21 +93,22 @@ public sealed class LocalOllamaRecognitionProvider : IDocumentRecognitionService
 
     private static string BuildPrompt() =>
         """
-        Ты распознаёшь российскую медицинскую справку для допуска к физкультуре. Верни ТОЛЬКО JSON с ключами:
-        full_name: ФИО студента (поле «Фамилия, имя, отчество» / «Выдана гр. …»). Рукопись читай максимально внимательно.
+        Перед тобой РОССИЙСКАЯ медицинская справка (часто форма 086/у). Она может быть на НЕСКОЛЬКИХ
+        изображениях — лицевая и ОБОРОТНАЯ стороны. Собери данные со ВСЕХ изображений и верни ОДИН JSON:
+        full_name: ФИО студента (поле «Фамилия, имя, отчество» / «Выдана гр. …»). Рукопись читай внимательно.
         document_type: одно из "086/у", "бассейн", "освобождение", иначе краткое описание.
-        issue_date: дата ВЫДАЧИ справки в ДД.ММ.ГГГГ, ТОЛЬКО если явно есть «выдана»/«дата выдачи».
-          НЕ бери дату рождения (после ФИО, «г.р.», «дата рождения») и НЕ дату лицензии/ОГРН/«от …». Сомневаешься — null.
-        validity_months: число месяцев, если написано «действительна N месяцев», иначе null.
+        place_of_study: место учёбы/работы (п.4), напр. «РЭУ им. Г.В. Плеханова».
+        past_illnesses: перенесённые заболевания (п.5), иначе null.
+        issue_date: «Дата выдачи справки» в ДД.ММ.ГГГГ (обычно на обороте). НЕ дата рождения, НЕ дата лицензии. Сомневаешься — null.
+        validity_months: число месяцев из «действительна N месяцев», иначе null.
         start_date, end_date: явный срок «действует с … по …» в ДД.ММ.ГГГГ, иначе null.
-        certificate_number: номер справки (после «СПРАВКА №» / «МЕДИЦИНСКАЯ СПРАВКА №»). НЕ лицензия, НЕ ОГРН, НЕ ИНН.
+        certificate_number: номер справки (после «СПРАВКА №»). НЕ лицензия, НЕ ОГРН, НЕ ИНН.
         medical_organization: название клиники.
-        physical_group: ТОЛЬКО если явно «физкультурная группа: …» или «основная/подготовительная/специальная медицинская группа».
-          Фраза «по группе А/Б» про бассейн — это НЕ физкультурная группа → null.
+        physical_group: физкультурная группа из ЗАКЛЮЧЕНИЯ (Основная/Подготовительная/Специальная А/Специальная Б/Освобождение) или null.
         health_group: "I"/"II"/"III"/"IV"/"V" или null.
-        admitted: true если «допущен», false если «не допущен», иначе null.
+        fit_for_pe: true если к физкультуре допущен / противопоказаний нет; false если не допущен/освобождён; иначе null.
         restrictions: заключение/ограничения кратко, без диагноза.
-        has_stamp: true/false (есть ли печать), has_signature: true/false (есть ли подпись/росчерк врача).
+        has_stamp: true/false (есть ли печати), has_signature: true/false (есть ли подписи врачей).
         Используй настоящий JSON null (без кавычек), не строку "null". Никакого текста кроме JSON.
         """;
 
@@ -121,17 +140,21 @@ public sealed class LocalOllamaRecognitionProvider : IDocumentRecognitionService
         return result;
     }
 
-    private async Task<byte[]> RenderPdfFirstPageAsync(byte[] pdf, CancellationToken cancellationToken)
+    // Рендерит ВСЕ страницы PDF (двухсторонняя справка) в JPEG. Низкий dpi (≈120) — иначе
+    // суммарный запрос к Ollama с несколькими изображениями превышает лимит (HTTP 400).
+    private async Task<List<byte[]>> RenderPdfAllPagesAsync(byte[] pdf, CancellationToken cancellationToken)
     {
-        var baseName = Path.Combine(Path.GetTempPath(), "reu-ocr-" + Guid.NewGuid().ToString("N"));
-        var pdfPath = baseName + ".pdf";
-        var pngPath = baseName + ".png";
+        var dir = Path.Combine(Path.GetTempPath(), "reu-ocr-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        var pdfPath = Path.Combine(dir, "in.pdf");
         await File.WriteAllBytesAsync(pdfPath, pdf, cancellationToken);
 
         try
         {
+            // Ширина страниц фиксируется ~1000px (-scale-to-x): иначе суммарный multi-image
+            // запрос к Ollama превышает лимит и возвращает HTTP 400.
             var psi = new ProcessStartInfo("pdftoppm",
-                $"-png -singlefile -r {_options.PdfRenderDpi} -f 1 -l 1 \"{pdfPath}\" \"{baseName}\"")
+                $"-jpeg -scale-to-x 1000 -scale-to-y -1 \"{pdfPath}\" \"{Path.Combine(dir, "p")}\"")
             {
                 RedirectStandardError = true,
                 UseShellExecute = false
@@ -141,21 +164,19 @@ public sealed class LocalOllamaRecognitionProvider : IDocumentRecognitionService
                 ?? throw new InvalidOperationException("Не удалось запустить pdftoppm (poppler не установлен?).");
             await process.WaitForExitAsync(cancellationToken);
 
-            if (!File.Exists(pngPath))
-                throw new InvalidOperationException("pdftoppm не отрендерил PDF в изображение.");
+            var files = Directory.GetFiles(dir, "p-*.jpg").OrderBy(f => f).ToList();
+            if (files.Count == 0)
+                throw new InvalidOperationException("pdftoppm не отрендерил PDF в изображения.");
 
-            return await File.ReadAllBytesAsync(pngPath, cancellationToken);
+            var result = new List<byte[]>();
+            foreach (var f in files.Take(4))   // страховка: не больше 4 страниц
+                result.Add(await File.ReadAllBytesAsync(f, cancellationToken));
+            return result;
         }
         finally
         {
-            TryDelete(pdfPath);
-            TryDelete(pngPath);
+            try { Directory.Delete(dir, true); } catch { /* best effort */ }
         }
-    }
-
-    private static void TryDelete(string path)
-    {
-        try { if (File.Exists(path)) File.Delete(path); } catch { /* best effort */ }
     }
 
     private sealed class OllamaGenerateResponse
