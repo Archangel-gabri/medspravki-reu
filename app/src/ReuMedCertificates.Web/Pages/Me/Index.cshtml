@@ -59,10 +59,11 @@ else
             <h2>Отправить справку</h2>
             <form id="upform" method="post" asp-page-handler="Upload" enctype="multipart/form-data">
                 <label class="fld">
-                    <span>Файл справки (PDF, JPG, PNG)</span>
-                    <input id="upfile" class="input" type="file" name="file" accept="application/pdf,image/jpeg,image/png" required />
+                    <span>Файл справки — PDF или фото (JPG/PNG)</span>
+                    <input id="upfile" class="input" type="file" name="files" accept="application/pdf,image/jpeg,image/png" multiple required />
                 </label>
-                <button type="submit" id="upbtn" class="btn btn-primary" style="margin-top:14px">Отправить на проверку</button>
+                <p class="note" style="margin-top:6px">Справка двухсторонняя? Выберите <strong>оба фото сразу</strong> (лицо и оборот) — сайт сам соберёт их в один документ. Или загрузите готовый PDF.</p>
+                <button type="submit" id="upbtn" class="btn btn-primary" style="margin-top:10px">Отправить на проверку</button>
                 <p class="note">Срок действия, группу здоровья, тип справки и наличие печати/подписи распознаёт ИИ — вводить вручную ничего не нужно. Финальное решение принимает преподаватель. Отправляя файл, вы даёте согласие на обработку медицинских данных (152-ФЗ) в периметре РЭУ.</p>
             </form>
             <script>

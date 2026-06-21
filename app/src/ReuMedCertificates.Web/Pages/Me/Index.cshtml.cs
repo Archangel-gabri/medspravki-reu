@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using ReuMedCertificates.Application.Abstractions;
 using ReuMedCertificates.Application.Common;
 using ReuMedCertificates.Application.Scans;
 using ReuMedCertificates.Application.Students;
@@ -17,14 +18,16 @@ public class IndexModel : PageModel
     private readonly IStudentService _students;
     private readonly IScanService _scans;
     private readonly ScanStorageOptions _scanOptions;
+    private readonly IDocumentAssembler _assembler;
 
     public IndexModel(UserManager<AppUser> users, IStudentService students,
-        IScanService scans, ScanStorageOptions scanOptions)
+        IScanService scans, ScanStorageOptions scanOptions, IDocumentAssembler assembler)
     {
         _users = users;
         _students = students;
         _scans = scans;
         _scanOptions = scanOptions;
+        _assembler = assembler;
     }
 
     public StudentDetail? Student { get; private set; }
@@ -46,7 +49,7 @@ public class IndexModel : PageModel
         return Page();
     }
 
-    public async Task<IActionResult> OnPostUploadAsync(IFormFile? file, CancellationToken cancellationToken)
+    public async Task<IActionResult> OnPostUploadAsync(List<IFormFile>? files, CancellationToken cancellationToken)
     {
         var studentId = await ResolveStudentIdAsync();
         if (studentId is null)
@@ -55,24 +58,59 @@ public class IndexModel : PageModel
             return Page();
         }
 
-        if (file is null || file.Length == 0)
-            ErrorMessage = "Файл не выбран.";
-        else if (file.Length > _scanOptions.MaxUploadBytes)
-            ErrorMessage = $"Файл больше {MaxUploadMb} МБ.";
-        else if (!_scanOptions.AllowedContentTypes.Contains(file.ContentType))
-            ErrorMessage = $"Недопустимый тип файла ({file.ContentType}). Разрешено: PDF, JPG, PNG.";
-        else if (!await HasAllowedSignatureAsync(file, cancellationToken))
-            ErrorMessage = "Файл не прошёл проверку сигнатуры — это не PDF/JPG/PNG.";
-        else
+        files = files?.Where(f => f is { Length: > 0 }).ToList() ?? new List<IFormFile>();
+
+        async Task<IActionResult> Fail(string msg)
         {
-            await using var stream = file.OpenReadStream();
-            // Срок/группу/тип/подлинность распознаёт ИИ — студент даты не вводит.
-            await _scans.UploadAsync(
-                new ScanUploadRequest(studentId.Value, stream, Path.GetFileName(file.FileName), file.ContentType),
-                cancellationToken);
-            Message = "Справка отправлена на проверку. ИИ распознаёт её, результат появится в таблице ниже.";
+            ErrorMessage = msg;
+            await LoadAsync(cancellationToken);
+            return Page();
         }
 
+        if (files.Count == 0) return await Fail("Файл не выбран.");
+        if (files.Count > 5) return await Fail("Слишком много файлов (максимум 5).");
+
+        // Валидация каждого файла (размер / тип / реальная сигнатура).
+        foreach (var f in files)
+        {
+            if (f.Length > _scanOptions.MaxUploadBytes)
+                return await Fail($"Файл «{f.FileName}» больше {MaxUploadMb} МБ.");
+            if (!_scanOptions.AllowedContentTypes.Contains(f.ContentType))
+                return await Fail($"Недопустимый тип файла ({f.ContentType}). Разрешено: PDF, JPG, PNG.");
+            if (!await HasAllowedSignatureAsync(f, cancellationToken))
+                return await Fail($"Файл «{f.FileName}» не прошёл проверку сигнатуры — это не PDF/JPG/PNG.");
+        }
+
+        var hasPdf = files.Any(f => f.ContentType.Contains("pdf", StringComparison.OrdinalIgnoreCase));
+        if (files.Count > 1 && hasPdf)
+            return await Fail("Выберите либо один PDF, либо несколько фотографий — не вперемешку.");
+
+        if (files.Count == 1)
+        {
+            var f = files[0];
+            await using var stream = f.OpenReadStream();
+            await _scans.UploadAsync(
+                new ScanUploadRequest(studentId.Value, stream, Path.GetFileName(f.FileName), f.ContentType),
+                cancellationToken);
+        }
+        else
+        {
+            // Несколько фото (лицо + оборот) → склеиваем в один PDF, чтобы ИИ видел все стороны.
+            var images = new List<byte[]>();
+            foreach (var f in files)
+            {
+                using var ms = new MemoryStream();
+                await f.CopyToAsync(ms, cancellationToken);
+                images.Add(ms.ToArray());
+            }
+            var pdf = await _assembler.ImagesToPdfAsync(images, cancellationToken);
+            await using var pdfStream = new MemoryStream(pdf);
+            await _scans.UploadAsync(
+                new ScanUploadRequest(studentId.Value, pdfStream, "Справка.pdf", "application/pdf"),
+                cancellationToken);
+        }
+
+        Message = "Справка отправлена на проверку. ИИ распознаёт её, результат появится в таблице ниже.";
         await LoadAsync(cancellationToken);
         return Page();
     }

@@ -65,6 +65,7 @@ public static class DependencyInjection
         services.AddSingleton(scanOptions);
         services.AddScoped<IScanStorage, FileScanStorage>();
         services.AddSingleton<IFieldProtector, DataProtectionFieldProtector>();
+        services.AddSingleton<IDocumentAssembler, ImageMagickDocumentAssembler>();
         services.AddScoped<IScanService, ScanService>();
 
         // Выбор провайдера распознавания по конфигу. План §3:

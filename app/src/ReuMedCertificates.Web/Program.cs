@@ -72,8 +72,10 @@ builder.Services.AddDataProtection()
 
 // Лимит размера загружаемого файла (скана справки) — чуть выше прикладного предела.
 var maxUpload = builder.Configuration.GetValue<long?>("Scans:MaxUploadBytes") ?? (10L * 1024 * 1024);
-builder.Services.Configure<FormOptions>(o => o.MultipartBodyLengthLimit = maxUpload + 512 * 1024);
-builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = maxUpload + 1024 * 1024);
+// До 5 файлов в одном запросе (несколько фото сторон справки) + запас.
+var maxRequest = maxUpload * 5 + 1024 * 1024;
+builder.Services.Configure<FormOptions>(o => o.MultipartBodyLengthLimit = maxRequest);
+builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = maxRequest);
 
 var app = builder.Build();
 
