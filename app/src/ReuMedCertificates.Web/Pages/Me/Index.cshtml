@@ -9,7 +9,7 @@
     // Допуск по сроку справки (строгий вид: серые точки, красный только для проблем).
     static (string text, string cls) Dopusk(DateOnly? start, DateOnly? end, bool rejected, DateOnly today)
     {
-        if (rejected) return ("Отклонена", "danger");
+        if (rejected) return ("—", "muted");
         if (start is null || end is null) return ("—", "muted");
         if (end < today) return ("Истекла", "danger");
         if (start > today) return ("Будет активна", "muted");
@@ -27,7 +27,7 @@
 
 @if (!string.IsNullOrEmpty(Model.Message)) { <div class="alert alert-success">@Model.Message</div> }
 @if (!string.IsNullOrEmpty(Model.ErrorMessage)) { <div class="alert alert-error">@Model.ErrorMessage</div> }
-@if (Model.MyScans.Count > 0 && Model.MyScans[0].RejectionReason is not null && Model.MyScans[0].CertificateId is null)
+@if (Model.MyScans.Count > 0 && Model.MyScans[0].RejectionReason is not null)
 {
     <div class="alert alert-warn">Последняя заявка отклонена: «@Model.MyScans[0].RejectionReason». Исправьте замечание и отправьте справку заново.</div>
 }
@@ -101,17 +101,13 @@ else
                             <td class="dim">@sc.UploadedAt.ToString("dd.MM.yyyy HH:mm")</td>
                             <td>@(st.HasValue && en.HasValue ? $"{st:dd.MM.yyyy} – {en:dd.MM.yyyy}" : "—")</td>
                             <td>
-                                @if (verified)
+                                @if (rejected)
                                 {
-                                    <span class="pill">Проверена</span>
+                                    <span class="pill" style="color:#a94442; background:#f9eeee; border-color:#ebccd1" title="@sc.RejectionReason">Отклонено</span>
                                 }
-                                else if (rejected)
+                                else if (verified)
                                 {
-                                    <span class="pill" style="color:#a94442; background:#f9eeee; border-color:#ebccd1" title="@sc.RejectionReason">Отклонена</span>
-                                }
-                                else if (sc.RecognitionStatus == "Processing")
-                                {
-                                    <span class="pill">ИИ проверяет…</span>
+                                    <span class="pill">Проверено</span>
                                 }
                                 else
                                 {

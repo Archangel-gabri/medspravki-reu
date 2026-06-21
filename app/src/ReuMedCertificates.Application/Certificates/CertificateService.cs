@@ -143,6 +143,16 @@ public sealed class CertificateService : ICertificateService
         cert.UpdatedByUserId = _user.UserId;
         cert.UpdatedAt = now;
 
+        // Связанный скан-заявку тоже помечаем «Отклонено» — студент увидит причину в кабинете.
+        var scan = await _db.Scans.FirstOrDefaultAsync(s => s.CertificateId == cert.Id, cancellationToken);
+        if (scan is not null)
+        {
+            scan.RejectionReason = "Допуск отозван: " + reason.Trim();
+            scan.RejectedAt = now;
+            scan.RecognitionStatus = "Rejected";
+            scan.UpdatedAt = now;
+        }
+
         _db.AuditLogs.Add(AuditEntryFactory.Create(
             _user, _clock, nameof(MedicalCertificate), cert.Id, "Revoke",
             $"Допуск отозван: {reason.Trim()}"));

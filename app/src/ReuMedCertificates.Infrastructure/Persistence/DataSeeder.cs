@@ -71,15 +71,16 @@ public static class DataSeeder
             await EnsureDemoUserAsync(userMgr, "admin", "Администратор системы", AppRoles.Admin);
 
             await SeedDemoDataAsync(db);
-            // Демо-студент-пользователь, привязанный к карточке Иванова (роль Student → свой допуск).
-            var ivanovStudent = await db.Students.FirstOrDefaultAsync(s => s.FullName == "Иванов Иван Сергеевич");
-            if (ivanovStudent is not null)
+            // Демо-студент-пользователь (ФИО как в ЛКС РЭУ — для совпадения ФИО на справке).
+            var demoStudent = await db.Students.FirstOrDefaultAsync(s => s.FullName == "Кубрак Вадим Андреевич")
+                ?? await db.Students.FirstOrDefaultAsync(s => s.FullName == "Иванов Иван Сергеевич");
+            if (demoStudent is not null)
             {
-                await EnsureDemoUserAsync(userMgr, "student", "Иванов Иван Сергеевич", AppRoles.Student);
+                await EnsureDemoUserAsync(userMgr, "student", "Кубрак Вадим Андреевич", AppRoles.Student);
                 var su = await userMgr.FindByNameAsync("student");
-                if (su is not null && su.StudentId != ivanovStudent.Id)
+                if (su is not null && su.StudentId != demoStudent.Id)
                 {
-                    su.StudentId = ivanovStudent.Id;
+                    su.StudentId = demoStudent.Id;
                     await userMgr.UpdateAsync(su);
                 }
             }

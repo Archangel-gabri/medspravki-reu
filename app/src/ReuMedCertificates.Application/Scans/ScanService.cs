@@ -290,8 +290,10 @@ public sealed class ScanService : IScanService
         var now = _clock.UtcNow;
         if (rec is null)
         {
-            scan.RecognitionStatus = "NeedsReview";
-            scan.AiNotes = "ИИ не смог распознать справку — нужна ручная проверка.";
+            scan.RecognitionStatus = "Rejected";
+            scan.RejectionReason = "Справку не удалось распознать. Сфотографируйте чётче (чтобы было видно ФИО, печать, подпись и срок) и пришлите снова.";
+            scan.RejectedAt = now;
+            scan.AiNotes = "ИИ не распознал документ.";
             scan.UpdatedAt = now;
             await _db.SaveChangesAsync(cancellationToken);
             return;
@@ -300,11 +302,11 @@ public sealed class ScanService : IScanService
         var p = ParseRecognized(rec.RawJson);
         var flags = new List<string>();
         if (!NameMatches(p.FullName, scan.Student?.FullName))
-            flags.Add($"ФИО на справке не совпало с профилем (распознано: {p.FullName ?? "—"})");
-        if (p.HasStamp != true) flags.Add("не видно печати");
+            flags.Add($"ФИО на справке не совпадает с вашим (распознано: «{p.FullName ?? "—"}»)");
+        if (p.HasStamp != true) flags.Add("не видно печати медучреждения");
         if (p.HasSignature != true) flags.Add("не видно подписи врача");
         if (p.StartDate is null || p.EndDate is null) flags.Add("не распознан срок действия");
-        else if (p.EndDate < p.StartDate) flags.Add("срок: дата окончания раньше начала");
+        else if (p.EndDate < p.StartDate) flags.Add("срок указан неверно (окончание раньше начала)");
 
         if (flags.Count == 0)
         {
@@ -317,8 +319,11 @@ public sealed class ScanService : IScanService
         }
         else
         {
-            scan.RecognitionStatus = "NeedsReview";
-            scan.AiNotes = "Нужна ручная проверка: " + string.Join("; ", flags);
+            // Один из трёх статусов — «Отклонено» с причиной (никакой ручной очереди).
+            scan.RecognitionStatus = "Rejected";
+            scan.RejectionReason = string.Join("; ", flags) + ". Пришлите корректную справку.";
+            scan.RejectedAt = now;
+            scan.AiNotes = "Отклонено ИИ: " + string.Join("; ", flags);
         }
         scan.UpdatedAt = now;
         await _db.SaveChangesAsync(cancellationToken);
