@@ -88,16 +88,18 @@
             <h2 style="margin-top:18px">История справок</h2>
             <div class="table-wrap">
                 <table class="grid">
-                    <thead><tr><th>Срок</th><th>Физ. группа</th><th>Ограничения</th><th>Статус</th><th></th></tr></thead>
+                    <thead><tr><th>Тип</th><th>Срок</th><th>Группа здоровья</th><th>Физ. группа</th><th>Ограничения</th><th>Статус</th><th></th></tr></thead>
                     <tbody>
                     @foreach (var c in s.History)
                     {
-                        var cls = StatusDisplay.CertClass(c.Status);
+                        var cls = c.Admitted ? StatusDisplay.CertClass(c.Status) : "danger";
                         <tr class="row-status @cls">
+                            <td>@StatusDisplay.CertType(c.Type)</td>
                             <td class="dim">@(c.Admitted ? $"{c.StartDate:dd.MM.yyyy} – {c.EndDate:dd.MM.yyyy}" : "—")</td>
+                            <td>@(c.Type == CertificateType.Pool || c.HealthGroup == HealthGroup.Unknown ? "—" : StatusDisplay.HealthGroup(c.HealthGroup))</td>
                             <td>@StatusDisplay.PhysicalGroup(c.PhysicalGroup)</td>
                             <td class="dim">@(string.IsNullOrWhiteSpace(c.Restrictions) ? "—" : c.Restrictions)</td>
-                            <td><span class="badge @cls"><span class="dot"></span>@StatusDisplay.CertText(c.Status)</span></td>
+                            <td><span class="badge @cls"><span class="dot"></span>@(c.Admitted ? StatusDisplay.CertText(c.Status) : "Не допущен")</span></td>
                             <td><a class="btn btn-sm" href="/students/@s.Id/certificates/@c.Id/edit">Изменить</a></td>
                         </tr>
                     }

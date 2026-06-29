@@ -59,15 +59,9 @@ else
                     }
                 </div>
                 <div style="display:flex; gap:8px">
-                    <a class="btn btn-sm" href="/scans/@row.Item.Id/file" target="_blank">Открыть</a>
-                    @if (Model.AiEnabled)
-                    {
-                        <form method="post" asp-page-handler="Recognize" style="margin:0">
-                            <input type="hidden" name="scanId" value="@row.Item.Id" />
-                            <button type="submit" class="btn btn-sm btn-primary">Распознать ИИ</button>
-                        </form>
-                        <a class="btn btn-sm" href="/students/@Model.StudentId/scans/@row.Item.Id/zoom">Зум по полям</a>
-                    }
+                    @* Распознавание и зум по полям выполняет ИИ автоматически при загрузке скана студентом.
+                       Преподавателю ручные кнопки не нужны — он только открывает скан и подтверждает/правит справку. *@
+                    <a class="btn btn-sm" href="/scans/@row.Item.Id/file" target="_blank">Открыть скан</a>
                 </div>
             </div>
 
