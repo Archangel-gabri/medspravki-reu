@@ -6,6 +6,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\ReuMedCertificates.Domain\ReuMedCertificates.Domain.csproj" />
+    <ProjectReference Include="..\..\src\ReuMedCertificates.Application\ReuMedCertificates.Application.csproj" />
   </ItemGroup>
 
   <ItemGroup>

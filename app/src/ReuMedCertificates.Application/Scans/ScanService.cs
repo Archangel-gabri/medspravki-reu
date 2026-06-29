@@ -303,45 +303,58 @@ public sealed class ScanService : IScanService
         }
 
         var p = ParseRecognized(rec.RawJson);
+        var today = DateOnly.FromDateTime(now);
+
+        // Шаг человека №1: «дата выдачи» не может быть датой рождения (в 086/у она стоит сразу за ФИО).
+        var issueDate = RecognitionRules.ResolveIssueDate(p.IssueDate, p.BirthDate);
+
+        // «Не допущен» — это НЕ брак, а валидный медицинский вердикт (Admitted=false).
+        var admitted = p.FitForPe != false;
+
         // Срок: явный «с–по», иначе «дата выдачи + N месяцев» (для 086/у обычно 6).
-        var start = p.StartDate ?? p.IssueDate;
+        var start = p.StartDate ?? issueDate;
         var end = p.EndDate ?? (start.HasValue ? start.Value.AddMonths(p.ValidityMonths ?? 6) : (DateOnly?)null);
 
-        // Брак скана (нельзя оформить запись — нужна пересдача/ручной ввод): ФИО/печать/срок.
+        // Брак скана (нужна пересдача/ручной ввод): ФИО / печать-или-ЭЦП / срок.
         var flags = new List<string>();
         if (!NameMatches(p.FullName, scan.Student?.FullName))
             flags.Add($"ФИО на справке не совпадает с вашим (распознано: «{p.FullName ?? "—"}»)");
-        if (p.HasStamp != true)
-            flags.Add("не видно печати медучреждения");
-        if (start is null || end is null)
+        // Шаг человека №2: достаточно печати ИЛИ электронной подписи (е-справки физпечати не имеют).
+        if (!RecognitionRules.StampOrSignaturePresent(p.HasStamp, p.ElectronicSignature))
+            flags.Add("не видно ни печати, ни электронной подписи");
+        // Шаг человека №3: срок нужен только для справки-ДОПУСКА; «не допущен» действует без срока.
+        if (RecognitionRules.ValidityRequired(admitted) && (start is null || end is null))
             flags.Add("не распознан срок действия");
-        else if (end < start)
+        else if (start is not null && end is not null && end < start)
             flags.Add("срок указан неверно");
-
-        // «Не допущен» — это НЕ брак, а валидный медицинский вердикт: справку оформляем,
-        // но как недопуск (Admitted=false). Препод увидит «Не допущен» в реестре.
-        var admitted = p.FitForPe != false;
 
         // У справки для бассейна нет «группы здоровья» (там группы А/Б по плаванию) — не подставляем её.
         var healthGroup = p.Type == CertificateType.Pool ? HealthGroup.Unknown : p.HealthGroup;
 
         if (flags.Count == 0)
         {
+            // Для «не допущен» без срока — нейтральные даты (в реестре срок у недопуска скрыт).
+            var effStart = start ?? issueDate ?? today;
+            var effEnd = end ?? effStart;
             await CreateCertificateFromScanAsync(scanId, new AddCertificateRequest(
-                scan.StudentId, start!.Value, end!.Value, p.IssueDate,
+                scan.StudentId, effStart, effEnd, issueDate,
                 healthGroup, p.PhysicalGroup, p.Restrictions, "Автопроверка ИИ",
                 p.CertNumber, p.Organization, p.Type, admitted), cancellationToken);
             scan.RecognitionStatus = "AutoApproved";
             scan.AiNotes = admitted
-                ? $"ИИ: ФИО совпало, печать на месте, допущен; срок {start:dd.MM.yyyy}–{end:dd.MM.yyyy}, группа {p.PhysicalGroup}."
-                : $"ИИ: ФИО совпало, печать на месте, но по справке НЕ допущен; срок {start:dd.MM.yyyy}–{end:dd.MM.yyyy}.";
-            // Флаг неуверенности: модель не сошлась по полю(ям) → препод должен проверить «Изменить».
-            if (rec.LowConfidenceFields is { Count: > 0 } low)
-                scan.AiNotes += " ⚠ Проверьте (распознано неуверенно): " + string.Join(", ", low) + ".";
+                ? $"ИИ: ФИО совпало, допуск подтверждён; срок {effStart:dd.MM.yyyy}–{effEnd:dd.MM.yyyy}, группа {p.PhysicalGroup}."
+                : "ИИ: ФИО совпало, по справке НЕ допущен.";
+            // Шаг человека №4: мягкие сигналы «проверьте» — неуверенность модели + подозрительная дата (год?).
+            var warns = new List<string>();
+            if (rec.LowConfidenceFields is { Count: > 0 } low) warns.AddRange(low);
+            if (admitted && !RecognitionRules.IssueDatePlausible(issueDate, today))
+                warns.Add("дата выдачи (проверьте год)");
+            if (warns.Count > 0)
+                scan.AiNotes += " ⚠ Проверьте (распознано неуверенно): " + string.Join(", ", warns) + ".";
         }
         else
         {
-            // Один из трёх статусов — «Отклонено» с причиной (никакой ручной очереди).
+            // Один из статусов — «Отклонено» с причиной (никакой ручной очереди).
             scan.RecognitionStatus = "Rejected";
             scan.RejectionReason = string.Join("; ", flags) + ". Пришлите корректную справку.";
             scan.RejectedAt = now;
@@ -355,7 +368,8 @@ public sealed class ScanService : IScanService
         string? FullName, DateOnly? StartDate, DateOnly? EndDate, DateOnly? IssueDate, int? ValidityMonths,
         HealthGroup HealthGroup, PhysicalEducationGroup PhysicalGroup, CertificateType Type,
         bool? HasStamp, bool? HasSignature, bool? FitForPe, string? PlaceOfStudy,
-        string? CertNumber, string? Organization, string? Restrictions);
+        string? CertNumber, string? Organization, string? Restrictions,
+        DateOnly? BirthDate, bool? ElectronicSignature);
 
     private static Recognized ParseRecognized(string? rawJson)
     {
@@ -384,11 +398,12 @@ public sealed class ScanService : IScanService
                 Str(r, "full_name"), ParseDate(Str(r, "start_date")), ParseDate(Str(r, "end_date")), ParseDate(Str(r, "issue_date")), Intg(r, "validity_months"),
                 MapHealth(Str(r, "health_group")), MapPhysical(Str(r, "physical_group")), MapType(Str(r, "document_type")),
                 Bln(r, "has_stamp"), Bln(r, "has_signature"), Bln(r, "fit_for_pe"), Str(r, "place_of_study"),
-                Str(r, "certificate_number"), Str(r, "medical_organization"), Str(r, "restrictions"));
+                Str(r, "certificate_number"), Str(r, "medical_organization"), Str(r, "restrictions"),
+                ParseDate(Str(r, "birth_date")), Bln(r, "electronic_signature"));
         }
         catch
         {
-            return new Recognized(null, null, null, null, null, HealthGroup.Unknown, PhysicalEducationGroup.None, CertificateType.Other, null, null, null, null, null, null, null);
+            return new Recognized(null, null, null, null, null, HealthGroup.Unknown, PhysicalEducationGroup.None, CertificateType.Other, null, null, null, null, null, null, null, null, null);
         }
     }
 

@@ -29,6 +29,7 @@ public sealed class LocalOllamaRecognitionProvider : IDocumentRecognitionService
     private static readonly (string Key, string Label)[] FieldMap =
     {
         ("full_name", "ФИО"),
+        ("birth_date", "Дата рождения"),
         ("document_type", "Тип документа"),
         ("place_of_study", "Место учёбы"),
         ("past_illnesses", "Перенесённые заболевания"),
@@ -44,6 +45,7 @@ public sealed class LocalOllamaRecognitionProvider : IDocumentRecognitionService
         ("restrictions", "Заключение/ограничения"),
         ("has_stamp", "Печать обнаружена"),
         ("has_signature", "Подпись обнаружена"),
+        ("electronic_signature", "Электронная подпись"),
     };
 
     public LocalOllamaRecognitionProvider(HttpClient http, RecognitionOptions options, ILogger<LocalOllamaRecognitionProvider> logger)
@@ -355,10 +357,14 @@ public sealed class LocalOllamaRecognitionProvider : IDocumentRecognitionService
         Перед тобой РОССИЙСКАЯ медицинская справка (часто форма 086/у). Она может быть на НЕСКОЛЬКИХ
         изображениях — лицевая и ОБОРОТНАЯ стороны. Собери данные со ВСЕХ изображений и верни ОДИН JSON:
         full_name: ФИО студента (поле «Фамилия, имя, отчество» / «Выдана гр. …»). Рукопись читай внимательно.
+        birth_date: ДАТА РОЖДЕНИЯ студента в ДД.ММ.ГГГГ (п.2 «Дата рождения», либо дата сразу после ФИО
+          в строке «Выдана гр. ФИО, ДД.ММ.ГГГГ»). Это НЕ дата выдачи справки — извлекай её ОТДЕЛЬНО.
         document_type: одно из "086/у", "бассейн", "освобождение", иначе краткое описание.
         place_of_study: место учёбы/работы (п.4), напр. «РЭУ им. Г.В. Плеханова».
         past_illnesses: перенесённые заболевания (п.5), иначе null.
-        issue_date: «Дата выдачи справки» в ДД.ММ.ГГГГ (обычно на обороте). НЕ дата рождения, НЕ дата лицензии. Сомневаешься — null.
+        issue_date: «Дата выдачи справки» в ДД.ММ.ГГГГ (ВНИЗУ справки/на обороте, рядом с подписью врача).
+          Она ПОЗЖЕ дат осмотров врачей и обычно совпадает с ними по году. НЕ дата рождения (birth_date),
+          НЕ дата лицензии из шапки. Сомневаешься — null.
         validity_months: число месяцев из «действительна N месяцев», иначе null.
         start_date, end_date: явный срок «действует с … по …» в ДД.ММ.ГГГГ, иначе null.
         certificate_number: номер справки (после «СПРАВКА №»). НЕ лицензия, НЕ ОГРН, НЕ ИНН.
@@ -369,7 +375,9 @@ public sealed class LocalOllamaRecognitionProvider : IDocumentRecognitionService
           ТОЛЬКО если отдельно явно указана словом; иначе null.
         fit_for_pe: true если к физкультуре допущен / противопоказаний нет; false если не допущен/освобождён; иначе null.
         restrictions: заключение/ограничения кратко, без диагноза.
-        has_stamp: true/false (есть ли печати), has_signature: true/false (есть ли подписи врачей).
+        has_stamp: true/false (есть ли физические печати), has_signature: true/false (есть ли подписи врачей).
+        electronic_signature: true, если на документе есть «Документ подписан электронной подписью» /
+          «Сертификат» / «электронной подписью». У такой справки ФИЗИЧЕСКОЙ печати может НЕ быть — это нормально.
         Используй настоящий JSON null (без кавычек), не строку "null". Никакого текста кроме JSON.
         """;
 
