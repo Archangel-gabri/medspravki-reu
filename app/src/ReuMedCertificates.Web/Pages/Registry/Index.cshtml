@@ -104,7 +104,7 @@
                 <td class="dim">@(r.Teacher ?? "—")</td>
                 <td>@(r.Types.Count == 0 ? "—" : string.Join(" / ", r.Types.Select(StatusDisplay.CertType)))</td>
                 <td>@(r.HealthGroup == HealthGroup.Unknown ? "—" : StatusDisplay.HealthGroup(r.HealthGroup))</td>
-                <td class="dim">@(r.StartDate is null ? "—" : $"{r.StartDate:dd.MM.yyyy} – {r.EndDate:dd.MM.yyyy}")</td>
+                <td class="dim">@(r.NotAdmitted || r.StartDate is null ? "—" : $"{r.StartDate:dd.MM.yyyy} – {r.EndDate:dd.MM.yyyy}")</td>
                 <td><span class="badge @cls"><span class="dot"></span>@statusText</span></td>
             </tr>
         }

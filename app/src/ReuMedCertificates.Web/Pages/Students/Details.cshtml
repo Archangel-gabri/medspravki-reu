@@ -57,7 +57,7 @@
                     <dl class="kv" style="margin-top:10px">
                         <dt>Тип</dt><dd>@StatusDisplay.CertType(c.Type)</dd>
                         <dt>Допуск</dt><dd>@(c.Admitted ? "Допущен" : "НЕ допущен (по справке)")</dd>
-                        <dt>Срок действия</dt><dd>@c.StartDate.ToString("dd.MM.yyyy") – @c.EndDate.ToString("dd.MM.yyyy")</dd>
+                        <dt>Срок действия</dt><dd>@(c.Admitted ? $"{c.StartDate:dd.MM.yyyy} – {c.EndDate:dd.MM.yyyy}" : "—")</dd>
                         <dt>Группа здоровья</dt><dd>@if (c.HealthGroup == HealthGroup.Unknown) { <text>не указана</text> } else { <strong>@StatusDisplay.HealthGroup(c.HealthGroup)</strong> <text>группа</text> }</dd>
                         @if (c.PhysicalGroup != PhysicalEducationGroup.None)
                         {
@@ -94,7 +94,7 @@
                     {
                         var cls = StatusDisplay.CertClass(c.Status);
                         <tr class="row-status @cls">
-                            <td class="dim">@c.StartDate.ToString("dd.MM.yyyy") – @c.EndDate.ToString("dd.MM.yyyy")</td>
+                            <td class="dim">@(c.Admitted ? $"{c.StartDate:dd.MM.yyyy} – {c.EndDate:dd.MM.yyyy}" : "—")</td>
                             <td>@StatusDisplay.PhysicalGroup(c.PhysicalGroup)</td>
                             <td class="dim">@(string.IsNullOrWhiteSpace(c.Restrictions) ? "—" : c.Restrictions)</td>
                             <td><span class="badge @cls"><span class="dot"></span>@StatusDisplay.CertText(c.Status)</span></td>
