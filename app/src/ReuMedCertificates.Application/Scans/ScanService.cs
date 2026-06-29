@@ -152,7 +152,8 @@ public sealed class ScanService : IScanService
             StartDate = request.StartDate,
             EndDate = request.EndDate,
             IssueDate = request.IssueDate,
-            HealthGroup = request.HealthGroup,
+            // У бассейновой справки группа здоровья (I–V) не применяется — там группы А/Б.
+            HealthGroup = request.Type == CertificateType.Pool ? HealthGroup.Unknown : request.HealthGroup,
             PhysicalGroup = request.PhysicalGroup,
             Type = request.Type,
             Admitted = request.Admitted,

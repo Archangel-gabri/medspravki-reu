@@ -31,7 +31,7 @@ public sealed class CertificateService : ICertificateService
             StartDate = request.StartDate,
             EndDate = request.EndDate,
             IssueDate = request.IssueDate,
-            HealthGroup = request.HealthGroup,
+            HealthGroup = NormalizeHealthGroup(request.Type, request.HealthGroup),
             PhysicalGroup = request.PhysicalGroup,
             Type = request.Type,
             Admitted = request.Admitted,
@@ -68,10 +68,11 @@ public sealed class CertificateService : ICertificateService
             ?? throw new InvalidOperationException("Справка не найдена.");
 
         var now = _clock.UtcNow;
+        var healthGroup = NormalizeHealthGroup(request.Type, request.HealthGroup);
         cert.StartDate = request.StartDate;
         cert.EndDate = request.EndDate;
         cert.IssueDate = request.IssueDate;
-        cert.HealthGroup = request.HealthGroup;
+        cert.HealthGroup = healthGroup;
         cert.PhysicalGroup = request.PhysicalGroup;
         cert.Type = request.Type;
         cert.Admitted = request.Admitted;
@@ -90,7 +91,7 @@ public sealed class CertificateService : ICertificateService
         _db.AuditLogs.Add(AuditEntryFactory.Create(
             _user, _clock, nameof(MedicalCertificate), cert.Id, "Edit",
             $"Справка изменена преподавателем (срок {request.StartDate:dd.MM.yyyy}–{request.EndDate:dd.MM.yyyy}, " +
-            $"гр.здоровья {request.HealthGroup}, тип {request.Type}, допуск: {(request.Admitted ? "да" : "нет")})"));
+            $"гр.здоровья {healthGroup}, тип {request.Type}, допуск: {(request.Admitted ? "да" : "нет")})"));
 
         await _db.SaveChangesAsync(cancellationToken);
     }
@@ -196,4 +197,8 @@ public sealed class CertificateService : ICertificateService
 
         await _db.SaveChangesAsync(cancellationToken);
     }
+
+    // У справки для бассейна группа здоровья (I–V) не применяется — там свои группы А/Б.
+    private static HealthGroup NormalizeHealthGroup(CertificateType type, HealthGroup group) =>
+        type == CertificateType.Pool ? HealthGroup.Unknown : group;
 }
