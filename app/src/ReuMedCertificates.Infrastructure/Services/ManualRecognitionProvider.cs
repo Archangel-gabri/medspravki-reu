@@ -11,4 +11,7 @@ public sealed class ManualRecognitionProvider : IDocumentRecognitionService
 {
     public Task<RecognitionResult> RecognizeAsync(ScanInput scan, CancellationToken cancellationToken = default)
         => Task.FromResult(RecognitionResult.ManualOnly());
+
+    public Task<string?> RecognizeFieldAsync(byte[] imageBytes, string fieldPrompt, CancellationToken cancellationToken = default)
+        => Task.FromResult<string?>(null);
 }

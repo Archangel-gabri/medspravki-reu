@@ -19,4 +19,15 @@ public sealed class RecognitionOptions
 
     /// <summary>DPI рендера PDF→изображение.</summary>
     public int PdfRenderDpi { get; set; } = 200;
+
+    /// <summary>Двухэтапное авто-распознавание: после общего прохода модель сама перечитывает ключевые поля
+    /// (дата выдачи/номер/группа) фокус-запросами (точнее на рукописи).</summary>
+    public bool TwoStage { get; set; } = true;
+
+    /// <summary>Сколько раз перечитывать дату выдачи для голосования (self-consistency): совпало большинство —
+    /// уверенно; разошлось — поле помечается «проверьте». 1 = без голосования.</summary>
+    public int VoteCount { get; set; } = 3;
+
+    /// <summary>Предобработка изображения перед распознаванием (нормализация контраста + резкость).</summary>
+    public bool Preprocess { get; set; } = true;
 }

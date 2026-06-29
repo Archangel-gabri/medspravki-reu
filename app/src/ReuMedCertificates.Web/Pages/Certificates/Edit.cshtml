@@ -1,13 +1,13 @@
-@page "/students/{id:guid}/certificates/new"
-@model ReuMedCertificates.Web.Pages.Certificates.CreateModel
+@page "/students/{id:guid}/certificates/{certId:guid}/edit"
+@model ReuMedCertificates.Web.Pages.Certificates.EditModel
 @{
-    ViewData["Title"] = "Новая справка";
+    ViewData["Title"] = "Изменить справку";
 }
 
 <div class="page-head">
     <div>
-        <h1>Добавить справку</h1>
-        <p>Студент: <strong>@Model.StudentName</strong></p>
+        <h1>Изменить справку</h1>
+        <p>Студент: <strong>@Model.StudentName</strong>. Исправьте поля, которые ИИ распознал неверно (даты, группа, тип, номер).</p>
     </div>
     <div class="head-actions"><a class="btn" href="/students/@Model.StudentId">← К карточке</a></div>
 </div>
@@ -48,6 +48,13 @@
                 </select>
             </div>
             <div class="field">
+                <label asp-for="Input.Admitted">Допуск</label>
+                <select class="input" asp-for="Input.Admitted">
+                    <option value="true">Допущен</option>
+                    <option value="false">НЕ допущен</option>
+                </select>
+            </div>
+            <div class="field">
                 <label asp-for="Input.PhysicalGroup">Физкультурная группа</label>
                 <select class="input" asp-for="Input.PhysicalGroup">
                     @foreach (var g in Enum.GetValues<PhysicalEducationGroup>())
@@ -79,10 +86,10 @@
             </div>
         </div>
 
-        <p class="note">Внесение справки преподавателем фиксируется как проверенная (источник «ручной ввод»). Диагноз не вносится — только функциональные ограничения (152-ФЗ).</p>
+        <p class="note">Правка преподавателем фиксируется в журнале и подтверждает справку (Verified). Срок действия и «Действует/Истекла» пересчитываются по новым датам.</p>
 
         <div class="form-actions">
-            <button type="submit" class="btn btn-primary">Сохранить справку</button>
+            <button type="submit" class="btn btn-primary">Сохранить изменения</button>
             <a class="btn" href="/students/@Model.StudentId">Отмена</a>
         </div>
     </form>

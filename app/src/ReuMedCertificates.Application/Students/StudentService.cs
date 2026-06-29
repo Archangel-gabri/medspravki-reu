@@ -84,7 +84,7 @@ public sealed class StudentService : IStudentService
             .Select(c => new CertificateView(
                 c.Id, c.IssueDate, c.StartDate, c.EndDate, c.CertificateNumber, c.MedicalOrganization,
                 c.HealthGroup, c.PhysicalGroup, c.Restrictions, c.Comment,
-                c.GetStatus(today, threshold), c.VerificationStatus, c.Type))
+                c.GetStatus(today, threshold), c.VerificationStatus, c.Type, c.Admitted))
             .ToList();
 
         var current = certificates.Where(c => c.EndDate >= today).ToList();

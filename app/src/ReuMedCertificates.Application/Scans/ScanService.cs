@@ -155,6 +155,7 @@ public sealed class ScanService : IScanService
             HealthGroup = request.HealthGroup,
             PhysicalGroup = request.PhysicalGroup,
             Type = request.Type,
+            Admitted = request.Admitted,
             Restrictions = request.Restrictions,
             Comment = request.Comment,
             CertificateNumber = request.CertificateNumber,
@@ -305,11 +306,10 @@ public sealed class ScanService : IScanService
         var start = p.StartDate ?? p.IssueDate;
         var end = p.EndDate ?? (start.HasValue ? start.Value.AddMonths(p.ValidityMonths ?? 6) : (DateOnly?)null);
 
+        // Брак скана (нельзя оформить запись — нужна пересдача/ручной ввод): ФИО/печать/срок.
         var flags = new List<string>();
         if (!NameMatches(p.FullName, scan.Student?.FullName))
             flags.Add($"ФИО на справке не совпадает с вашим (распознано: «{p.FullName ?? "—"}»)");
-        if (p.FitForPe == false)
-            flags.Add("по справке к физкультуре НЕ допущен");
         if (p.HasStamp != true)
             flags.Add("не видно печати медучреждения");
         if (start is null || end is null)
@@ -317,14 +317,26 @@ public sealed class ScanService : IScanService
         else if (end < start)
             flags.Add("срок указан неверно");
 
+        // «Не допущен» — это НЕ брак, а валидный медицинский вердикт: справку оформляем,
+        // но как недопуск (Admitted=false). Препод увидит «Не допущен» в реестре.
+        var admitted = p.FitForPe != false;
+
+        // У справки для бассейна нет «группы здоровья» (там группы А/Б по плаванию) — не подставляем её.
+        var healthGroup = p.Type == CertificateType.Pool ? HealthGroup.Unknown : p.HealthGroup;
+
         if (flags.Count == 0)
         {
             await CreateCertificateFromScanAsync(scanId, new AddCertificateRequest(
                 scan.StudentId, start!.Value, end!.Value, p.IssueDate,
-                p.HealthGroup, p.PhysicalGroup, p.Restrictions, "Автопроверка ИИ",
-                p.CertNumber, p.Organization, p.Type), cancellationToken);
+                healthGroup, p.PhysicalGroup, p.Restrictions, "Автопроверка ИИ",
+                p.CertNumber, p.Organization, p.Type, admitted), cancellationToken);
             scan.RecognitionStatus = "AutoApproved";
-            scan.AiNotes = $"ИИ: ФИО совпало, печать на месте, допущен; срок {start:dd.MM.yyyy}–{end:dd.MM.yyyy}, группа {p.PhysicalGroup}.";
+            scan.AiNotes = admitted
+                ? $"ИИ: ФИО совпало, печать на месте, допущен; срок {start:dd.MM.yyyy}–{end:dd.MM.yyyy}, группа {p.PhysicalGroup}."
+                : $"ИИ: ФИО совпало, печать на месте, но по справке НЕ допущен; срок {start:dd.MM.yyyy}–{end:dd.MM.yyyy}.";
+            // Флаг неуверенности: модель не сошлась по полю(ям) → препод должен проверить «Изменить».
+            if (rec.LowConfidenceFields is { Count: > 0 } low)
+                scan.AiNotes += " ⚠ Проверьте (распознано неуверенно): " + string.Join(", ", low) + ".";
         }
         else
         {

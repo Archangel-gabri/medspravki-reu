@@ -34,6 +34,7 @@ public sealed class CertificateService : ICertificateService
             HealthGroup = request.HealthGroup,
             PhysicalGroup = request.PhysicalGroup,
             Type = request.Type,
+            Admitted = request.Admitted,
             Restrictions = request.Restrictions,
             Comment = request.Comment,
             CertificateNumber = request.CertificateNumber,
@@ -56,6 +57,42 @@ public sealed class CertificateService : ICertificateService
 
         await _db.SaveChangesAsync(cancellationToken);
         return certificate.Id;
+    }
+
+    public async Task UpdateAsync(EditCertificateRequest request, CancellationToken cancellationToken = default)
+    {
+        if (request.EndDate < request.StartDate)
+            throw new InvalidOperationException("Дата окончания не может быть раньше даты начала.");
+
+        var cert = await _db.Certificates.FirstOrDefaultAsync(c => c.Id == request.CertificateId && !c.IsDeleted, cancellationToken)
+            ?? throw new InvalidOperationException("Справка не найдена.");
+
+        var now = _clock.UtcNow;
+        cert.StartDate = request.StartDate;
+        cert.EndDate = request.EndDate;
+        cert.IssueDate = request.IssueDate;
+        cert.HealthGroup = request.HealthGroup;
+        cert.PhysicalGroup = request.PhysicalGroup;
+        cert.Type = request.Type;
+        cert.Admitted = request.Admitted;
+        cert.CertificateNumber = string.IsNullOrWhiteSpace(request.CertificateNumber) ? null : request.CertificateNumber.Trim();
+        cert.MedicalOrganization = string.IsNullOrWhiteSpace(request.MedicalOrganization) ? null : request.MedicalOrganization.Trim();
+        cert.Restrictions = string.IsNullOrWhiteSpace(request.Restrictions) ? null : request.Restrictions.Trim();
+        cert.Comment = string.IsNullOrWhiteSpace(request.Comment) ? null : request.Comment.Trim();
+        // Правка преподавателем = подтверждение факта человеком (ФЗ-273) → справка остаётся/становится Verified.
+        cert.VerificationStatus = VerificationStatus.Verified;
+        cert.RejectionReason = null;
+        cert.VerifiedByUserId = _user.UserId;
+        cert.VerifiedAt = now;
+        cert.UpdatedByUserId = _user.UserId;
+        cert.UpdatedAt = now;
+
+        _db.AuditLogs.Add(AuditEntryFactory.Create(
+            _user, _clock, nameof(MedicalCertificate), cert.Id, "Edit",
+            $"Справка изменена преподавателем (срок {request.StartDate:dd.MM.yyyy}–{request.EndDate:dd.MM.yyyy}, " +
+            $"гр.здоровья {request.HealthGroup}, тип {request.Type}, допуск: {(request.Admitted ? "да" : "нет")})"));
+
+        await _db.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<ReviewItem>> GetReviewQueueAsync(CancellationToken cancellationToken = default)

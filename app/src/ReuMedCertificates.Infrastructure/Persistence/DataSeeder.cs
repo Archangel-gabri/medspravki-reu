@@ -327,6 +327,10 @@ public static class DataSeeder
             @"ALTER TABLE medical_certificates ADD COLUMN IF NOT EXISTS ""Type"" integer NOT NULL DEFAULT 0;");
         await db.Database.ExecuteSqlRawAsync(
             @"ALTER TABLE certificate_scans ADD COLUMN IF NOT EXISTS ""AiNotes"" text;");
+
+        // Медвердикт «допущен/не допущен» (v2): не допущен — валидная справка-недопуск. Идемпотентно.
+        await db.Database.ExecuteSqlRawAsync(
+            @"ALTER TABLE medical_certificates ADD COLUMN IF NOT EXISTS ""Admitted"" boolean NOT NULL DEFAULT true;");
     }
 
     /// <summary>Создаёт демо-пользователя (если нет) и приводит его роли РОВНО к одной нужной (минимизация прав).</summary>

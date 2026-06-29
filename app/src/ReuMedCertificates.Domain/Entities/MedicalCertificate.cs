@@ -27,6 +27,10 @@ public class MedicalCertificate : BaseEntity
     /// <summary>Тип справки (086/у, бассейн, освобождение…).</summary>
     public CertificateType Type { get; set; } = CertificateType.Standard086;
 
+    /// <summary>Медицинский вердикт: допущен ли студент к занятию/виду активности.
+    /// false = справка действительна, но к физкультуре/бассейну НЕ допущен (напр. аллергия на хлор).</summary>
+    public bool Admitted { get; set; } = true;
+
     /// <summary>Ограничения — функциональные формулировки, БЕЗ диагноза (152-ФЗ минимизация).</summary>
     public string? Restrictions { get; set; }
     public string? Comment { get; set; }

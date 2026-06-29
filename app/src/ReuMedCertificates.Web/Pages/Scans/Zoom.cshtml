@@ -1,0 +1,144 @@
+@page "/students/{id:guid}/scans/{scanId:guid}/zoom"
+@model ReuMedCertificates.Web.Pages.Scans.ZoomModel
+@{
+    ViewData["Title"] = "Уточнить поле (зум)";
+}
+
+<div class="page-head">
+    <div>
+        <h1>Уточнить поле — зум по скану</h1>
+        <p>Выделите на скане участок (напр. «дата выдачи»), выберите тип поля и нажмите «Распознать выделенное». Модель прочитает увеличенный фрагмент — точнее, чем всю страницу.</p>
+    </div>
+    <div class="head-actions">
+        <a class="btn" href="/students/@Model.StudentId/scans">← К сканам</a>
+        <a class="btn" href="/students/@Model.StudentId">К карточке</a>
+    </div>
+</div>
+
+@Html.AntiForgeryToken()
+
+<div class="card" style="display:flex; gap:20px; flex-wrap:wrap; align-items:flex-start">
+    <div style="flex:1; min-width:320px">
+        @if (Model.PageCount > 1)
+        {
+            <div style="margin-bottom:10px; display:flex; gap:8px; align-items:center">
+                <button type="button" class="btn btn-sm" id="prev">← Стр.</button>
+                <span>Страница <strong id="pagenum">1</strong> из @Model.PageCount</span>
+                <button type="button" class="btn btn-sm" id="next">Стр. →</button>
+            </div>
+        }
+        <div id="wrap" style="position:relative; display:inline-block; border:1px solid #ccd; max-width:100%">
+            <img id="pageimg" src="?handler=Page&n=1" alt="Скан" style="display:block; max-width:100%; height:auto; user-select:none" draggable="false" />
+            <canvas id="overlay" style="position:absolute; left:0; top:0; cursor:crosshair"></canvas>
+        </div>
+    </div>
+
+    <div style="width:300px; max-width:100%">
+        <div class="field">
+            <label for="field">Тип поля</label>
+            <select class="input" id="field">
+                <option value="issue_date">Дата выдачи</option>
+                <option value="number">Номер справки</option>
+                <option value="health_group">Группа здоровья</option>
+                <option value="name">ФИО</option>
+                <option value="text">Любой текст</option>
+            </select>
+        </div>
+        <button type="button" class="btn btn-primary" id="recog" style="margin-top:10px; width:100%">Распознать выделенное</button>
+        <div style="margin-top:14px">
+            <label class="note">Результат:</label>
+            <div id="result" style="margin-top:6px; padding:10px; border:1px solid #ccd; border-radius:4px; min-height:42px; background:#fafcff; word-break:break-word">—</div>
+            <button type="button" class="btn btn-sm" id="copy" style="margin-top:8px">Скопировать</button>
+        </div>
+        <p class="note" style="margin-top:14px">Распознанное значение скопируйте и вставьте в форму «Изменить / поправить» справки. Так связаны два этапа: общий черновик + точечная сверка.</p>
+    </div>
+</div>
+
+<script>
+(function () {
+    const img = document.getElementById('pageimg');
+    const canvas = document.getElementById('overlay');
+    const ctx = canvas.getContext('2d');
+    const resultBox = document.getElementById('result');
+    const tokenEl = document.querySelector('input[name="__RequestVerificationToken"]');
+    const token = tokenEl ? tokenEl.value : '';
+    const pageCount = @Model.PageCount;
+    let curPage = 1;
+    let start = null, rect = null;
+
+    function sizeCanvas() {
+        canvas.width = img.clientWidth;
+        canvas.height = img.clientHeight;
+        draw();
+    }
+    function pos(e) {
+        const r = canvas.getBoundingClientRect();
+        const cx = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
+        const cy = (e.touches ? e.touches[0].clientY : e.clientY) - r.top;
+        return { x: cx, y: cy };
+    }
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (rect) {
+            ctx.fillStyle = 'rgba(31,91,168,0.15)';
+            ctx.strokeStyle = '#1F5BA8';
+            ctx.lineWidth = 2;
+            ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+            ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+        }
+    }
+    function down(e) { start = pos(e); rect = null; e.preventDefault(); }
+    function move(e) {
+        if (!start) return;
+        const p = pos(e);
+        rect = { x: Math.min(start.x, p.x), y: Math.min(start.y, p.y), w: Math.abs(p.x - start.x), h: Math.abs(p.y - start.y) };
+        draw();
+        e.preventDefault();
+    }
+    function up() { start = null; }
+
+    img.addEventListener('load', sizeCanvas);
+    if (img.complete) sizeCanvas();
+    window.addEventListener('resize', sizeCanvas);
+    canvas.addEventListener('mousedown', down);
+    canvas.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+    canvas.addEventListener('touchstart', down, { passive: false });
+    canvas.addEventListener('touchmove', move, { passive: false });
+    window.addEventListener('touchend', up);
+
+    function gotoPage(n) {
+        if (n < 1 || n > pageCount) return;
+        curPage = n;
+        rect = null; draw();
+        const pn = document.getElementById('pagenum'); if (pn) pn.textContent = n;
+        img.src = '?handler=Page&n=' + n + '&_=' + Date.now();
+    }
+    const prev = document.getElementById('prev'); if (prev) prev.addEventListener('click', () => gotoPage(curPage - 1));
+    const next = document.getElementById('next'); if (next) next.addEventListener('click', () => gotoPage(curPage + 1));
+
+    document.getElementById('recog').addEventListener('click', async () => {
+        if (!rect || rect.w < 8 || rect.h < 8) { alert('Выделите область на скане мышью.'); return; }
+        const fd = new FormData();
+        fd.append('Page', curPage);
+        fd.append('X', (rect.x / canvas.width).toFixed(4));
+        fd.append('Y', (rect.y / canvas.height).toFixed(4));
+        fd.append('W', (rect.w / canvas.width).toFixed(4));
+        fd.append('H', (rect.h / canvas.height).toFixed(4));
+        fd.append('Field', document.getElementById('field').value);
+        fd.append('__RequestVerificationToken', token);
+        resultBox.textContent = 'Распознаю…';
+        try {
+            const resp = await fetch('?handler=Recognize', { method: 'POST', body: fd });
+            const data = await resp.json();
+            resultBox.textContent = data.ok ? (data.value || '(пусто)') : ('Ошибка: ' + data.error);
+        } catch (err) {
+            resultBox.textContent = 'Ошибка запроса: ' + err;
+        }
+    });
+    document.getElementById('copy').addEventListener('click', () => {
+        const t = resultBox.textContent || '';
+        navigator.clipboard?.writeText(t);
+    });
+})();
+</script>

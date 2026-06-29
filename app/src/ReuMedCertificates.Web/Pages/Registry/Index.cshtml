@@ -77,6 +77,7 @@
                 <th>Курс</th>
                 <th>Группа</th>
                 <th>Преподаватель</th>
+                <th>Тип справки</th>
                 <th>Группа здоровья</th>
                 <th>Срок справки</th>
                 <th>Статус</th>
@@ -85,29 +86,26 @@
         <tbody>
         @if (Model.Result.Rows.Count == 0)
         {
-            <tr><td colspan="8" class="empty">Ничего не найдено. Измените фильтры или <a href="/students/new">добавьте студента</a>.</td></tr>
+            <tr><td colspan="9" class="empty">Ничего не найдено. Измените фильтры или <a href="/students/new">добавьте студента</a>.</td></tr>
         }
         @foreach (var r in Model.Result.Rows)
         {
-            var cls = StatusDisplay.CertClass(r.Status);
+            string cls; string statusText;
+            if (r.NotAdmitted) { cls = "danger"; statusText = "Не допущен"; }
+            else if (r.Status is not null) { cls = StatusDisplay.CertClass(r.Status); statusText = StatusDisplay.CertText(r.Status); }
+            else if (r.HasPendingReview) { cls = "muted"; statusText = "На проверке"; }
+            else if (r.HasRejectedScan) { cls = "warn"; statusText = "Заявка отклонена"; }
+            else { cls = "danger"; statusText = "Нет справки"; }
             <tr class="row-status @cls">
                 <td class="name-cell"><a href="/students/@r.StudentId">@r.FullName</a></td>
                 <td class="dim">@r.Department</td>
                 <td>@r.Course</td>
                 <td>@r.Group</td>
                 <td class="dim">@(r.Teacher ?? "—")</td>
+                <td>@(r.Types.Count == 0 ? "—" : string.Join(" / ", r.Types.Select(StatusDisplay.CertType)))</td>
                 <td>@(r.HealthGroup == HealthGroup.Unknown ? "—" : StatusDisplay.HealthGroup(r.HealthGroup))</td>
                 <td class="dim">@(r.StartDate is null ? "—" : $"{r.StartDate:dd.MM.yyyy} – {r.EndDate:dd.MM.yyyy}")</td>
-                <td>
-                    @if (r.Status is null && r.HasPendingReview)
-                    {
-                        <span class="badge muted"><span class="dot"></span>На проверке</span>
-                    }
-                    else
-                    {
-                        <span class="badge @cls"><span class="dot"></span>@StatusDisplay.CertText(r.Status)</span>
-                    }
-                </td>
+                <td><span class="badge @cls"><span class="dot"></span>@statusText</span></td>
             </tr>
         }
         </tbody>

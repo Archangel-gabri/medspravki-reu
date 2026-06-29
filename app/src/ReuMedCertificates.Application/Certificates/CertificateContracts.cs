@@ -13,7 +13,23 @@ public sealed record AddCertificateRequest(
     string? Comment,
     string? CertificateNumber,
     string? MedicalOrganization,
-    CertificateType Type = CertificateType.Standard086);
+    CertificateType Type = CertificateType.Standard086,
+    bool Admitted = true);
+
+/// <summary>Правка справки преподавателем (исправление ошибок распознавания/данных).</summary>
+public sealed record EditCertificateRequest(
+    Guid CertificateId,
+    DateOnly StartDate,
+    DateOnly EndDate,
+    DateOnly? IssueDate,
+    HealthGroup HealthGroup,
+    PhysicalEducationGroup PhysicalGroup,
+    CertificateType Type,
+    bool Admitted,
+    string? CertificateNumber,
+    string? MedicalOrganization,
+    string? Restrictions,
+    string? Comment);
 
 /// <summary>Элемент очереди «На проверке» (неподтверждённая справка).</summary>
 public sealed record ReviewItem(
@@ -34,6 +50,9 @@ public interface ICertificateService
 {
     /// <summary>Добавляет справку студенту (ручной ввод преподавателем = сразу Verified, источник Manual).</summary>
     Task<Guid> AddAsync(AddCertificateRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>Правит справку (исправление ошибок ИИ-распознавания преподавателем). Правка = подтверждение человеком.</summary>
+    Task UpdateAsync(EditCertificateRequest request, CancellationToken cancellationToken = default);
 
     /// <summary>Очередь справок со статусом «На проверке».</summary>
     Task<IReadOnlyList<ReviewItem>> GetReviewQueueAsync(CancellationToken cancellationToken = default);

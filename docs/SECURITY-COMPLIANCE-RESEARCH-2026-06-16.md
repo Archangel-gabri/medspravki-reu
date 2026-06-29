@@ -28,12 +28,62 @@
 8. **Прочие подтверждённые пробелы:** секреты в репозитории (пароль БД `postgres`, демо‑пароль `<демо-пароль>`, `AllowedHosts="*"`), `AuditLog` не INSERT‑only на уровне БД, медданные на Ollama по `http` без TLS, нет per‑page ролей (`/journal`, `/import` доступны всем), нет CI‑гейта безопасности (анализаторы выключены). SHA‑256 «перепроверяется при открытии» — **ложная декларация** (не реализовано) — P2.
 
 **Итог.** Архитектурное ядро и минимизация данных — здоровые. Перед развёртыванием «с сетевым доступом студентов» и перед интеграцией в портал необходимо закрыть приоритет **P0** (аудит чтения медданных, цепочку XSS приём↔раздача, security‑заголовки, trust‑boundary прокси) и блок **P1** (object‑level доступ + аудит, шифрование at‑rest, per‑page роли, секреты, INSERT‑only аудит, TLS к Ollama, согласие). Без РСБ‑аудита, шифрования носителей, АВЗ и разграничения доступа аттестация ИСПДн под УЗ‑3 невозможна.
+---
+
+# ⚠️ Обновление и повторная верификация — 2026-06-17
+
+**Важно:** код приложения изменился между первичным снимком код‑фактов (2026‑06‑16) и повторной проверкой (2026‑06‑17) — судя по всему, по итогам первой версии этого отчёта в код внесён **пакет P0‑исправлений**. Повторный OWASP‑прогон (§3.6) перечитал текущий код; адверсариал‑верификаторы по 21 находке в этот момент **упали на жёстком лимите сессии** (не на содержании), поэтому контрверификация спорных P0 выполнена **прямым чтением текущего кода** (это авторитетнее агентов). Ниже — что подтверждённо **исправлено**, и что **остаётся открытым**, с актуальными `file:line`. Разделы §3.2–§3.5 ниже описывают снимок 2026‑06‑16 и **заменяются** этим обновлением там, где здесь сказано «исправлено».
+
+## A. Подтверждённо ИСПРАВЛЕНО (P0 в значительной мере закрыт)
+
+| Было (P0/P1 в §3.8) | Текущий код (`file:line`) | Статус |
+|---|---|---|
+| Нет security‑заголовков → clickjacking (P0‑3) | `Program.cs:45-56` — middleware ставит `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, CSP `default-src 'self'; frame-ancestors 'none'; object-src 'self'; base-uri 'self'` | **Исправлено** (остаток: CSP `script-src/style-src 'unsafe-inline'` → новый P2, см. MED‑A05‑CSP) |
+| Спуфинг проксированных заголовков (P0‑4) | `Program.cs:40-43` — `UseForwardedHeaders(XForwardedFor\|XForwardedProto)`, доверие по умолчанию только loopback (`KnownProxies`) | **Базово исправлено** (при reverse‑proxy на отдельном хосте — добавить IP прокси в `KnownProxies`; включить `XForwardedHost`+`PathBase`) |
+| Не логируется чтение медскана (P0‑1) | `Program.cs:86-91` — `AuditLog "ScanView"` на каждое открытие (range‑догрузки не дублируются) + `Cache-Control: no-store`, `Content-Disposition: inline` (`:93-94`) | **Исправлено** (на чтении скана) |
+| Не логируется вход/выход; `IpAddress`=null | `Login.cshtml.cs:68,72` — `Login`/`LoginFailed` с IP; `AuditEntryFactory.cs:29` — `IpAddress = user.IpAddress`; `CurrentUser.cs:23` — `RemoteIpAddress` | **Исправлено** |
+| Цепочка stored‑XSS на раздаче (P0‑2, serve) | `nosniff` (`Program.cs:49`) + CSP `default-src 'self'` + whitelist типов pdf/jpeg/png ⇒ браузер не sniff‑ит и не исполняет HTML/SVG под видом картинки | **Существенно смягчено** (остаётся: приём всё ещё по клиентскому MIME без magic‑байт/AV — см. ниже; `Content-Disposition` = `inline`, не `attachment`) |
+
+Это закрывает или нейтрализует **все четыре P0** из первичного чек‑листа. Хорошая работа — фиксы точно соответствуют приоритету отчёта.
+
+## B. Остаётся ОТКРЫТЫМ (актуальный P0/P1/P2 на 2026‑06‑17)
+
+**P0 — теперь главный остаточный риск: контроль доступа.** (Подтверждено прямым чтением: `ScanService.OpenAsync` без изменений, ролей на страницах нет.)
+
+| # | Уязвимость | `file:line` (текущий код) | Severity | Контр‑аргумент |
+|---|---|---|---|---|
+| U‑1 | **Плоская авторизация: `AuthorizeFolder("/")` даёт только аутентификацию, ролей на страницах НЕТ** — `/journal`, `/import`, `/review` (Approve/Reject), `/students`, `/scans` доступны любому вошедшему | `Program.cs:25` (единственная ролевая проверка — `:96` на `/scans/file`); `[Authorize(Roles…)]` в Pages — 0 | **P0 для v2 / P1 для v1** | В v1 все — сотрудники Admin+Teacher в ЛВС (риск смягчён); но при вводе роли студента (v2) — мгновенное раскрытие; `/journal`,`/import` — админ‑функции |
+| U‑2 | **BOLA/IDOR: нет object‑level scope** — `ScanService.OpenAsync` ищет скан только по `scanId`; `CertificateService.Approve/Reject` — только по `certificateId` | `ScanService.cs:85-94` (без owner‑фильтра); `CertificateService.cs:85-127` | **P0 для v2 / P1 для v1** | Это отсутствие границы во всём приложении (модель идентичности плоская), роль‑гейт отсекает студентов/анонимов; «вся кафедра видит всё» может быть осознанным — но решить до прода |
+
+**P1 (подтверждено в текущем коде):**
+
+| # | Уязвимость | `file:line` | Контр‑аргумент |
+|---|---|---|---|
+| U‑3 | **Секреты в репо + приложение работает как `postgres`‑СУПЕРПОЛЬЗОВАТЕЛЬ** | `appsettings.json:3,8,21`; `DependencyInjection.cs:25`; `ApplicationDbContextFactory.cs:12`; `DataSeeder.cs:45` | dev‑плейсхолдеры (`BootstrapUser:Enabled=false` в проде); но утекают в git, а суперюзер усиливает риск подделки аудита |
+| U‑4 | **`audit_logs` не INSERT‑only** (нет REVOKE/триггеров) — усугубляется работой из‑под суперюзера | миграции: REVOKE/TRIGGER = 0 | приложение само не делает UPDATE/DELETE — но это дисциплина, не техническая неизменяемость |
+| U‑5 | **Нет шифрования спецкатегории at‑rest** (файлы/столбцы/`RecognitionJson`) | `FileScanStorage.cs:29,49`; grep `IDataProtector/pgcrypto/Aes` = 0 | BitLocker/TDE закрывает кражу диска; но не логический доступ/бэкап; v1‑стратегия «не хранить сканы» |
+| U‑6 | Приём загрузки по клиентскому MIME без magic‑байт/AV | `ScanService.cs`/`Scans/Index.cshtml.cs` без изменений | импакт XSS теперь снят `nosniff`; но AV (мера АВЗ) и проверка сигнатуры остаются нужны |
+| U‑7 | Медданные на Ollama по `http` без TLS (Ollama без auth) | `appsettings.Development.json:16`; `LocalOllamaRecognitionProvider.cs:61-62` | WireGuard/Tailscale шифрует транспорт; но не L7‑аутентификация пира |
+| U‑8 | poppler: рендер недоверенного PDF без песочницы/лимитов + нет rate‑limit на распознавание | `LocalOllamaRecognitionProvider.cs:116-146` | рендер только стр.1, отд. GPU‑узел; defense‑in‑depth оправдан |
+| U‑9 | Нет учёта письменного согласия (152‑ФЗ ст.10) | `Domain/Entities/*` — нет `Consent` | орг‑мера РЭУ + поле модели; блокер перед прод‑загрузкой сканов |
+| U‑10 | Нет CI‑гейта безопасности (анализаторы выключены) | `Directory.Build.props` (`TreatWarningsAsErrors=false`) | MVP без remote — но дёшево включить сейчас |
+
+**P2:** CSP `'unsafe-inline'` для script/style (`Program.cs:53-54`, MED‑A05‑CSP); cookie без явных `Secure`/`SameSite=Strict`/`ExpireTimeSpan` (`DependencyInjection.cs:44-49`); `AllowedHosts="*"` (`appsettings.json:21`); lockout с дефолтной длительностью (5 мин, `MaxFailedAccessAttempts=5`, без `DefaultLockoutTimeSpan`); перечисление по сообщению о блокировке (`Login.cshtml.cs:76-77`); LIKE‑wildcard `%`/`_` (`RegistryQueryService`); SHA‑256 не сверяется при чтении; пакеты `8.0.4`/устаревший `FluentValidation.AspNetCore 11.3.0`; `SqlRosterSource` raw SQL из конфига.
+
+## C. Полная адверсариал‑верификация — ВЫПОЛНЕНА (см. §3.9)
+
+Все 35 находок (21 из снимка + 14 OWASP) прошли независимую проверку «опровергни вывод» против текущего кода (полная таблица — §3.9). Итог: **6 опровергнуто/исправлено, 10 подтверждено, 19 частично; после переоценки важности P1 осталось только 3.** Подтверждённый главный остаток:
+
+1. **Контроль доступа** — `MED-A01-FOLDER` (плоская авторизация, нет ролей на страницах) — **P1**; BOLA/`MED-A01-BOLA-SCAN` и `MED-A01-REVIEW` понижены до P2 в доверенной v1‑ЛВС, но становятся **P0 при вводе роли студента (v2)**.
+2. **Шифрование спецкатегории at‑rest** — `MED-A02-AT-REST` — **P1**.
+3. **Неизменяемость аудита + приложение под `postgres`‑суперпользователем** — `audit-not-insert-only` — **P1**.
+
+Всё остальное (секреты в dev‑конфиге, cookie‑флаги, `AllowedHosts=*`, CSP `'unsafe-inline'`, LIKE, poppler, AV, NuGet 8.0.4, SHA‑сверка, SSO/iframe‑будущее) — **P2** (или none, если уже закрыто). Это финальная картина после пакета фиксов.
 
 
 ---
 
 # Блок 1. Зарубежные реализации цифрового учёта медсправок/допусков
-
 I have comprehensive primary-source coverage. The FERPA athletics-screening point is especially valuable (HK Law/ed.gov: medical forms used to screen for eligibility in school-sponsored athletics become "education records"). I have enough to write the full report. Let me compose the final deliverable.
 
 # БЛОК 1. Цифровизация учёта студенческих медсправок и допусков к физкультуре/спорту в зарубежных вузах (США, ЕС/Великобритания, Канада, Австралия)
@@ -296,7 +346,6 @@ I have comprehensive primary-source coverage. The FERPA athletics-screening poin
 ---
 
 # Блок 2. Правовой режим обработки медданных студентов: зарубеж vs РФ
-
 I now have all primary sources confirmed with precise article citations. I have everything needed to write the complete jurisdiction-by-jurisdiction analysis with the comparison table.
 
 ---
@@ -495,6 +544,7 @@ PIPEDA не содержит обязательной локализации, н
 
 ---
 
+# None
 ---
 
 # Блок 3. Безопасность (главный блок)
@@ -531,7 +581,7 @@ PIPEDA не содержит обязательной локализации, н
 **Уточнения по угрозам, опровергнутым код‑фактами (false‑negative по брифу):** command/argument‑injection в `pdftoppm` через имя файла **невозможен** (`UseShellExecute=false`, пути из server‑side GUID, имя клиента туда не попадает); SSRF к Ollama через пользовательский ввод **отсутствует** (endpoint только из конфига); CSV/формула‑инъекция в текущем коде **неприменима** (ClosedXML подключён, но Excel‑экспорт/импорт в коде не используется — импорт идёт из SQL/OData); HTMX заявлен, но в коде **не используется** (формы — обычный POST, авто‑antiforgery Razor Pages действует).
 
 
-## 3.2. Конвейер загрузки скан‑PDF и OCR/рендер
+## 3.2. Конвейер загрузки скан‑PDF и OCR/рендер _(снимок 2026‑06‑16)_
 
 ## Ревью конвейера обработки скан-PDF: «приём → хранение → рендер → OCR → раздача»
 
@@ -566,7 +616,7 @@ PIPEDA не содержит обязательной локализации, н
 - ASP.NET Core file uploads — рекомендация не доверять `IFormFile.ContentType`, проверять сигнатуру — https://learn.microsoft.com/aspnet/core/mvc/models/file-uploads (2026-06-16)
 
 
-## 3.3. Защита медданных и меры ФСТЭК‑21 (УЗ‑3)
+## 3.3. Защита медданных и меры ФСТЭК‑21 (УЗ‑3) _(снимок 2026‑06‑16)_
 
 ## Карта медданных MedSpravki-REU: что / где / как защищено
 
@@ -684,7 +734,7 @@ PIPEDA не содержит обязательной локализации, н
 - [OWASP ASVS 4.0](https://owasp.org/www-project-application-security-verification-standard/) — V3 (сессии/cookie), V4 (доступ), V14 (конфигурация/заголовки) — проверено 2026-06-16
 
 
-## 3.5. DevSecOps‑плейбук: чем прогнать и проверить + ручной pentest‑чек‑лист
+## 3.5. DevSecOps‑плейбук + ручной pentest‑чек‑лист
 
 # DevSecOps-плейбук: MedSpravki-REU
 
@@ -1298,7 +1348,72 @@ curl -skI -b "$OUT/a.jar" "https://localhost:5080/scans/<GUID_ДРУГОГО>/fi
 - ASP.NET Core proxy/forwarded-headers — https://learn.microsoft.com/aspnet/core/host-and-deploy/proxy-load-balancer — проверено 2026-06-16
 
 
-## 3.7. Код‑факты приложения (AppSec baseline, привязка к `file:line`)
+## 3.6. OWASP Top‑10 — повторный аудит по ТЕКУЩЕМУ коду (2026‑06‑17)
+
+> Этот подраздел отражает код на 2026‑06‑17 (после пакета P0‑фиксов, см. раздел «Обновление» вверху). Где он расходится со снимком §3.2–§3.5/§3.7 (2026‑06‑16) — верен ЭТОТ подраздел.
+
+## Повторный аудит MedSpravki-REU (ASP.NET Core 8 + Razor Pages) — OWASP Top 10 2021
+
+ВАЖНО: код заметно изменился со времени написания ТЗ к этому прогону. Несколько «известных» проблем из брифа УЖЕ ИСПРАВЛЕНЫ в текущем коде — фиксирую честно, чтобы не раздувать отчёт ложными находками:
+
+- **Security-заголовки ЕСТЬ** — `Program.cs:45-56` ставит `X-Content-Type-Options=nosniff`, `X-Frame-Options=DENY`, `Referrer-Policy=no-referrer` и CSP (`default-src 'self'`, `frame-ancestors 'none'`, `object-src 'self'`, `base-uri 'self'`). Бриф утверждал «НЕТ security-заголовков» — это неверно для текущего кода. CSP содержит `script-src 'unsafe-inline'` и `style-src 'unsafe-inline'` — это единственная слабость заголовков (см. MED-A05-CSP).
+- **Аудит просмотра скана ПИШЕТСЯ** — `Program.cs:86-91` логирует `ScanView` один раз на открытие (range-догрузки не дублируются). Бриф утверждал «аудит просмотра не пишется» — неверно.
+- **Аудит входа/выхода ПИШЕТСЯ** — `Login.cshtml.cs:68/72`, `Logout.cshtml.cs:30` пишут `Login/LoginFailed/Logout` с IP.
+- **IpAddress в аудите ЕСТЬ** — `AuditEntryFactory.cs:29` берёт `user.IpAddress`, `CurrentUser.cs:23` отдаёт `RemoteIpAddress`. Бриф «нет IpAddress» — неверно.
+- **ForwardedHeaders сужены** — `Program.cs:40-43` доверяет X-Forwarded-* только loopback (KnownProxies/KnownNetworks по умолчанию), что корректно для IP-аудита за реверс-прокси.
+- **Антифоргери активен** — Razor Pages валидируют токен на POST по умолчанию, `_Layout.cshtml:36` рендерит `@Html.AntiForgeryToken()`. Минимал-API только GET. CSRF неприменим/смягчён.
+- **Path traversal в хранилище закрыт** — `FileScanStorage.cs:48/55` использует `Path.GetFileName(storedName)`, имена — серверные GUID. Подтверждаю отсутствие command-injection в pdftoppm (`UseShellExecute=false`, серверный GUID-путь, `LocalOllamaRecognitionProvider.cs:125-130`) и отсутствие SSRF через ввод (Ollama-URL из конфига). XSS-стоков нет: ни одного `Html.Raw`/`MarkupString` во всём проекте — Razor автоэкранирует распознанные ИИ-поля и ФИО.
+
+### Вердикт по 10 категориям
+
+**A01 Broken Access Control — ЕСТЬ ПРОБЛЕМА (главная).** Авторизация только на уровне папки: `Program.cs:25` `AuthorizeFolder("/")` требует лишь *аутентификации*, без ролей. Единственная ролевая проверка — minimal-API `/scans/{id}/file` (`Program.cs:96` RequireRole Teacher/HeadOfDepartment/Admin). Ни одна Razor-страница не несёт `[Authorize(Roles=…)]`: `Journal/Index.cshtml.cs`, `Import/Index.cshtml.cs`, `Review/Index.cshtml.cs` (Approve/Reject), `Certificates/Create.cshtml.cs`, `Students/Details.cshtml.cs`, `Scans/Index.cshtml.cs` (список/загрузка/распознавание) доступны ЛЮБОМУ вошедшему. Object-level scope (BOLA) отсутствует на всех уровнях: `ScanService.OpenAsync` (`ScanService.cs:85-94`) и `GetAsync` ищут скан только по `scanId`, без проверки владельца/преподавателя студента; `CertificateService.ApproveAsync/RejectAsync` (`CertificateService.cs:85-127`) — только по `certificateId`. В v1 (только сотрудники Admin+Teacher) риск СМЯГЧЁН доверенным персоналом в ЛВС, но при появлении роли Student (план v2) это мгновенно превращается в полное BOLA-раскрытие спецкатегории ПДн. (MED-A01-FOLDER, MED-A01-BOLA-SCAN, MED-A01-REVIEW)
+
+**A02 Cryptographic Failures — ЕСТЬ ПРОБЛЕМА (смягчено).** Сканы медсправок (спецкатегория ПДн ст.10 152-ФЗ + врачебная тайна) хранятся в ФС в открытом виде, без шифрования at-rest (`FileScanStorage.cs:29` `File.Create`). Канал к Ollama — `http://<tailscale-ip>:11434` (`appsettings.Development.json:16`), плейн-текст по Tailscale (Tailscale = WireGuard-шифрование на транспорте, смягчает). Пароли — корректный Identity-хеш (PBKDF2). (MED-A02-AT-REST)
+
+**A03 Injection — СМЯГЧЕНО / частично.** SQL-инъекций нет: EF Core параметризует значения, LIKE использует параметр (`RegistryQueryService.cs:39`). НО user-ввод поиска интерполируется в LIKE-паттерн без экранирования `%`/`_` — `Student.Normalize` (`Student.cs:36-38`) только lower/trim, wildcards не вычищает → LIKE-wildcard abuse + обход GIN-индекса (sequential scan, мини-DoS). `SqlRosterSource.cs:27` гонит raw SQL из конфига (`_options.Sql.Query`) — это доверенный конфиг, не пользовательский ввод (low). Лог-инъекция Serilog: значения подставляются как структурированные параметры (`{Model}`, `{Count}`), но в `AuditLog.Description` кладётся интерполированный текст с именами файлов/ФИО — в БД (jsonb/text) это безопасно, без CRLF-инъекции в файловые логи. (MED-A03-LIKE)
+
+**A04 Insecure Design — ЕСТЬ ПРОБЛЕМА (смягчено архитектурой).** Дизайн в целом грамотный (case-lifecycle, human-in-the-loop, RequiresManualReview всегда true). Но: (а) отсутствует объектная модель «кто чей преподаватель» в авторизации (см. A01); (б) нет rate-limiting на `/scans/{id}/file` и на распознавание (ИИ-эндпойнт ~50 сек/запрос — потенциальный resource-DoS); (в) загрузка сканов привязана к route-`studentId` без проверки, что текущий пользователь вправе грузить за этого студента. (MED-A04-RATELIMIT — учтено в A01/A05.)
+
+**A05 Security Misconfiguration — ЕСТЬ ПРОБЛЕМА.** (1) `AllowedHosts=*` (`appsettings.json:21`) — Host-header не валидируется. (2) Секреты в `appsettings.json`: `Password=postgres` (`appsettings.json:3`), причём это суперпользователь Postgres — приложение и аудит работают из-под него. (3) CSP допускает `script-src/style-src 'unsafe-inline'` (`Program.cs:53-54`) — ослабляет анти-XSS. (4) Bootstrap-пароль `<демо-пароль>` в открытом виде в конфиге (`appsettings.json:8`, `appsettings.Development.json:6`). (MED-A05-HOSTS, MED-A05-SECRETS, MED-A05-CSP, MED-A07-BOOTSTRAP)
+
+**A06 Vulnerable & Outdated Components — ЕСТЬ ПРОБЛЕМА (низкий-средний).** Все пакеты прибиты к `8.0.4` (`*.csproj`): `Microsoft.EntityFrameworkCore 8.0.4`, `Npgsql.EntityFrameworkCore.PostgreSQL 8.0.4`, `Microsoft.AspNetCore.Identity.EntityFrameworkCore 8.0.4`, `Serilog.AspNetCore 8.0.1`, `FluentValidation.AspNetCore 11.3.0` (deprecated/устарел). 8.0.4 — ранний релиз .NET 8 (апрель 2024); последующие 8.0.x патчи закрывали .NET-CVE. Нет `Directory.Packages.props`/lock-файла. (MED-A06-NUGET)
+
+**A07 Identification & Authentication — ЕСТЬ ПРОБЛЕМА (смягчено).** (1) Демо-пароль `<демо-пароль>` + bootstrap-юзер получает СРАЗУ две роли Admin+Teacher (`DataSeeder.cs:48-49`) — слияние ролей. В проде `BootstrapUser:Enabled=false` (`appsettings.json:6`) — смягчает, но включён в Development. (2) Cookie ASP.NET Identity: Secure/HttpOnly/SameSite НЕ заданы явно (`DependencyInjection.cs:44-49` — только LoginPath/SlidingExpiration). Дефолты Identity: HttpOnly=true, SameSite=Lax, SecurePolicy=SameAsRequest — не «Always», т.е. без принудительного HTTPS-флага. (3) Перечисление пользователей: сообщение об ошибке логина обобщённое (`Login.cshtml.cs:78` «Неверный логин или пароль»), НО различимое «Учётная запись заблокирована» при lockout (`Login.cshtml.cs:76-77`) косвенно подтверждает существование логина. (4) Lockout: задан только `MaxFailedAccessAttempts=5`; длительность НЕ переопределена → действует дефолт Identity = 5 минут (бриф «без длительности» неточен; дефолт есть, но он короткий — слабая защита от перебора). (MED-A07-BOOTSTRAP, MED-A07-COOKIE, MED-A07-ENUM)
+
+**A08 Software & Data Integrity — ЕСТЬ ПРОБЛЕМА (низкий).** SHA-256 считается при загрузке (`FileScanStorage.cs:25-42`) и пишется в `Sha256`, НО при чтении/распознавании (`ScanService.OpenAsync/RecognizeAsync`) хеш НЕ сверяется — нарушение целостности файла на диске не детектируется. Аудит-логи в обычной таблице без append-only (см. A09). (MED-A08-SHA)
+
+**A09 Logging & Monitoring — ЕСТЬ ПРОБЛЕМА (средний).** Бизнес-аудит присутствует и богат (вход, выход, просмотр скана, создание/подтверждение/отклонение справки, импорт). НО таблица `audit_logs` (`InitialCreate.cs:62-81`) — обычная таблица: нет REVOKE UPDATE/DELETE, нет триггеров append-only, нет отдельной роли БД. Приложение коннектится как суперпользователь `postgres` → журнал РСБ полностью изменяем/удаляем как через прямой доступ к БД, так и через любой будущий баг с raw-SQL. Для медданных (323-ФЗ, требования к неизменяемости РСБ) это существенно. Логи только в Console (`Program.cs:19`) — нет персистентного sink/алертов. (MED-A09-IMMUTABLE)
+
+**A10 SSRF — НЕПРИМЕНИМО / смягчено.** Единственный исходящий вызов — Ollama (`LocalOllamaRecognitionProvider.cs:61`) и OData-1С (`OneCODataRosterSource.cs:40`); оба URL берутся из конфигурации, не из пользовательского ввода. SSRF через ввод нет (подтверждаю). OData без TLS-pinning/проверки схемы — теоретический риск при компрометации конфига, но это не SSRF и контролируется админом (low, не выделяю в отдельную находку P-уровня).
+
+### Итог приоритизации
+- **P0:** MED-A01-FOLDER (отсутствие ролевой авторизации страниц), MED-A01-BOLA-SCAN (нет owner-проверки при чтении скана спецкатегории ПДн).
+- **P1:** MED-A01-REVIEW (BOLA на Approve/Reject/Create), MED-A05-SECRETS (суперюзер-пароль БД в конфиге), MED-A09-IMMUTABLE (мутабельный РСБ + суперюзер), MED-A02-AT-REST, MED-A07-COOKIE.
+- **P2:** MED-A05-HOSTS, MED-A05-CSP, MED-A07-BOOTSTRAP, MED-A07-ENUM, MED-A03-LIKE, MED-A06-NUGET, MED-A08-SHA.
+
+Главный системный риск: приложение спроектировано «для доверенных сотрудников в ЛВС» (v1), и в этом контексте многое СМЯГЧЕНО. Но архитектура авторизации (folder-level, без object-scope) не выдержит перехода к v2 «личный кабинет студента», к которому проект явно готовится (роли Student, StudentUpload, Scans). Перед любым сетевым доступом студентов A01-находки обязаны быть закрыты.
+
+### Находки OWASP‑прогона (текущий код)
+
+| ID | Sev | Категория | Находка | Где | Контр‑аргумент |
+|---|---|---|---|---|---|
+| MED-A01-FOLDER | P0 | Access Control | AuthorizeFolder("/") даёт только аутентификацию без ролей — все страницы (журнал, импорт,  | Program.cs:25 (options.Conventions.AuthorizeFolder("/")); ни в одном P | В v1 единственные заведённые пользователи — сотрудники кафедры (bootstrap Admin+Teacher),  |
+| MED-A01-BOLA-SCAN | P0 | Access Control | ScanService.OpenAsync читает скан медсправки только по scanId без проверки владельца (IDOR | ScanService.cs:87 (var scan = await _db.Scans.AsNoTracking().FirstOrDe | Имена хранилища — серверные GUID (FileScanStorage), а scanId тоже GUID — угадать нельзя, п |
+| MED-A01-REVIEW | P1 | Access Control | Approve/Reject/Create справок и список сканов доступны любому аутентифицированному без obj | CertificateService.cs:87 (FirstOrDefaultAsync(c => c.Id == certificate | В v1 решения принимают только сотрудники (Admin+Teacher), для которых подтверждение справо |
+| MED-A05-SECRETS | P1 | Configuration | Пароль суперпользователя Postgres в открытом виде в appsettings.json; приложение работает  | appsettings.json:3 ("DefaultConnection": "...Username=postgres;Passwor | Это значение по умолчанию для локального Docker-Postgres (reu-pg), Password=postgres — заг |
+| MED-A09-IMMUTABLE | P1 | Logging & Monitoring | Таблица audit_logs не защищена от изменения/удаления (нет REVOKE/триггеров/append-only рол | InitialCreate.cs:62-81 (CreateTable audit_logs — только PrimaryKey, ни | В ЛВС РЭУ доступ к самой СУБД ограничен админами, а прикладной слой нигде не предоставляет |
+| MED-A02-AT-REST | P1 | Cryptography | Сканы медсправок (спецкатегория ПДн) хранятся без шифрования at-rest | FileScanStorage.cs:29-39 (File.Create + запись буфера без шифрования); | Файлы лежат вне wwwroot (недоступны статикой), имена — непрогнозируемые GUID, развёртывани |
+| MED-A07-COOKIE | P1 | Authentication | Cookie аутентификации без явных Secure/SameSite=Strict/Always — полагается на дефолты Iden | DependencyInjection.cs:44-49 (ConfigureApplicationCookie — нет options | Дефолты Identity уже дают HttpOnly=true и SameSite=Lax, антифоргери активен, UseHttpsRedir |
+| MED-A05-HOSTS | P2 | Configuration | AllowedHosts=* — отсутствует валидация Host-заголовка | appsettings.json:21 ("AllowedHosts": "*") | В v1 нет исходящих ссылок/писем и нет публичного кэша, развёртывание офлайн в ЛВС за фикси |
+| MED-A05-CSP | P2 | Configuration | CSP допускает script-src/style-src 'unsafe-inline' — ослаблена анти-XSS защита | Program.cs:53-54 ("...style-src 'self' 'unsafe-inline'; script-src 'se | На текущий момент в проекте нет ни одного Html.Raw/MarkupString, Razor автоэкранирует весь |
+| MED-A07-BOOTSTRAP | P2 | Authentication | Демо-пароль <демо-пароль> в конфиге и слияние ролей Admin+Teacher у bootstrap-пользователя | DataSeeder.cs:45 (CreateAsync(user, bootstrap["Password"] ?? "ChangeMe | В продовом appsettings.json BootstrapUser:Enabled=false — учётка автоматически не создаётс |
+| MED-A07-ENUM | P2 | Authentication | Различимое сообщение о блокировке косвенно подтверждает существование логина; lockout-окно | Login.cshtml.cs:56-79 (PasswordSignInAsync lockoutOnFailure:true; ветк | Перечисление пользователей в системе на ~76 известных преподавателей кафедры (ФИО публичны |
+| MED-A03-LIKE | P2 | Injection | LIKE-wildcard abuse: символы % и _ из поискового ввода не экранируются (Student.Normalize  | RegistryQueryService.cs:35-40 (var normalized = Student.Normalize(filt | Это доступно только аутентифицированным сотрудникам, SQL-инъекции нет (EF параметризует),  |
+| MED-A06-NUGET | P2 | Dependencies | Зависимости прибиты к ранним версиям 8.0.4 / устаревший FluentValidation.AspNetCore | ReuMedCertificates.Infrastructure.csproj (EFCore 8.0.4, Npgsql 8.0.4,  | Конкретные эксплуатируемые CVE в 8.0.4 для данного набора не подтверждены в этом аудите (н |
+| MED-A08-SHA | P2 | Data Integrity | SHA-256 скана считается при загрузке, но не сверяется при чтении/распознавании | ScanService.cs:85-94 (OpenAsync открывает поток без сверки scan.Sha256 | Подмена файла требует прямого доступа к файловой системе сервера (ОС-компрометация), что с |
+
+
+## 3.7. Код‑факты приложения _(снимок 2026‑06‑16; раздел «Обновление» вверху отражает изменения)_
 
 All facts confirmed. The `IpAddress` column exists but is never populated by `AuditEntryFactory.Create` (no parameter for it); `Login`/`LoginFailed`/`Export` action types exist only as comments/demo-seed, never written by real runtime code. Here is the structured fact reference.
 
@@ -1470,6 +1585,8 @@ All facts confirmed. The `IpAddress` column exists but is never populated by `Au
 10. **SHA-256 при открытии не перепроверяется**, вопреки декларации в UI/модели — `FileScanStorage.cs:45-51` vs `CertificateScan.cs:27`, `Scans/Index.cshtml:25`.
 
 Корректировки к исходному брифу (подтверждено кодом): (а) ClosedXML подключён, но Excel-импорт/экспорт в коде отсутствует — импорт идёт из SQL/OData, поэтому CSV/формула-инъекция в текущем коде неприменима; (б) command/argument injection в pdftoppm через имя файла невозможен — `UseShellExecute=false` и пути формируются из server-side GUID, имя клиента туда не попадает; (в) SSRF через пользовательский ввод к Ollama отсутствует — endpoint берётся только из конфига; (г) HTMX в коде не используется.
+
+
 ---
 
 ## 3.8. Сводный security‑чек‑лист P0/P1/P2 (с результатами адверсариал‑проверки)
@@ -1552,8 +1669,58 @@ All facts confirmed. The `IpAddress` column exists but is never populated by `Au
 
 ---
 
-# Блок 4. Стек портала РЭУ и варианты интеграции
+## 3.9. Полная адверсариал-верификация — результаты по ТЕКУЩЕМУ коду (2026‑06‑17)
 
+Все 35 находок (21 из снимка + 14 OWASP) прошли независимую проверку «опровергни вывод» против текущего кода. Итог: **6 опровергнуто (исправлено в коде), 10 подтверждено, 19 частично**; после переоценки важности — **P1 осталось только 3**, остальное снижено до P2/none. Это и есть актуальная картина после пакета фиксов.
+
+**Итог по приоритетам (после верификации):**
+
+- 🟢 **Опровергнуто/исправлено (6):** security‑заголовки+CSP, аудит чтения медскана, доверие прокси‑заголовкам (ForwardedHeaders), open‑redirect (LocalRedirect), цепочка XSS приём+раздача (нейтрализована `nosniff`).
+- 🔴 **Осталось P1 (3):** `MED-A01-FOLDER` — плоская авторизация (нет ролей на страницах); `MED-A02-AT-REST` — нет шифрования спецкатегории at‑rest; `audit-not-insert-only` — `audit_logs` изменяем + приложение работает как `postgres`‑суперпользователь.
+- 🟡 **Снижено до P2 (25)** и **none (7)** — действуют в контексте доверенной ЛВС v1; становятся значимее при вводе роли студента (v2) и при интеграции.
+
+| ID | Финдер | Вердикт | Итог.sev | Итоговая формулировка | Сильнейший контр‑аргумент |
+|---|---|---|---|---|---|
+| serve-no-nosniff-inline-stored-xss | P0 | 🟢 опроверг. | P2 | ОПРОВЕРГНУТО. Заявленный факт неверен: X-Content-Type-Options: nosniff ДА присутствует на ответе /scans/{id}/file — он выставляется глобальным middleware (Program.cs:49) до выполнения эндпоинта, плюс  | Сильнейший довод В ПОЛЬЗУ остаточного риска (чтобы не закрывать слишком оптимистично): nosniff не устраняет XSS полностью — для PDF и SVG он бесполезен. Если ContentType  |
+| upload-trusts-client-mime | P0 | 🟢 опроверг. | P2 | ОПРОВЕРГНУТО как P0. Заявленный механизм ("проверка только по клиентскому MIME без проверки сигнатуры/магических байт, обход подделкой одного заголовка") не соответствует коду: в OnPostUploadAsync, по | Сильнейший довод В ПОЛЬЗУ finding (почему не "none", а P2): сигнатурная проверка примитивна и проверяет лишь первые байты, поэтому polyglot-файл (валидный %PDF/JFIF-загол |
+| clickjacking-no-frame-headers | P0 | 🟢 опроверг. | none | ОПРОВЕРГНУТО. Заявление «конвейер не выставляет ни одного защитного заголовка» неверно: Program.cs:46-56 содержит middleware, безусловно (вне dev-проверки) выставляющий X-Frame-Options: DENY, CSP с fr | Сильнейший довод В ПОЛЬЗУ исходного вывода (т.е. почему его автор мог так написать): заявленный evidence явно цитирует «grep по UseSecurityHeaders/Headers.Append — 0». Фо |
+| no-audit-on-cross-context-access | P1 | 🟢 опроверг. | none | ОПРОВЕРГНУТО. Утверждение «просмотр/скачивание медскана не логируется и IP не пишется» неверно. GET /scans/{id}/file (Program.cs:85-91) пишет запись аудита ScanView на CertificateScan при каждом не-ra | Сильнейший довод за частичную правоту: буквальная под-формулировка «ScanService.OpenAsync не пишет аудит чтения» технически ВЕРНА — OpenAsync (ScanService.cs:85-94) тольк |
+| open-redirect-sso-return | P2 | 🟢 опроверг. | none | ОПРОВЕРГНУТО. В текущем коде open-redirect отсутствует: единственная точка приёма returnUrl (Login.cshtml.cs:69) использует `LocalRedirect`, который блокирует любой не-локальный адрес — то есть код УЖ | Сильнейший довод в пользу находки: она честно сформулирована как УСЛОВНАЯ/будущая («при интеграции SSO добавится returnUrl/redirect_uri-логика»), а CLAUDE.md проекта прям |
+| spoof-fwd-identity | P0 | 🟢 опроверг. | none | ОПРОВЕРГНУТО. Заявленные «факты» прямо противоречат коду: UseForwardedHeaders/ForwardedHeadersOptions ПРИСУТСТВУЕТ (Program.cs:40-43, с дефолтным loopback-доверием прокси), security-заголовки ПРИСУТСТ | Сильнейший довод В ПОЛЬЗУ находки (и почему он всё равно не тянет на находку): сценарий (d) — это БУДУЩАЯ интеграция под доменом Bitrix, которой в коде ещё нет. Если кафе |
+| MED-A01-FOLDER | P0 | 🔴 подтв. | P1 | ПОДТВЕРЖДЕНО (severity понижена P0→P1). Все Razor Pages защищены только `AuthorizeFolder("/")` (Program.cs:25), который требует лишь факта аутентификации (default-политика = RequireAuthenticatedUser); | Два ослабляющих момента. (1) В строке evidence/claim есть фактическая ошибка: утверждается «НЕТ security-заголовков» — это ложь, Program.cs:45-56 ставит X-Content-Type-Op |
+| MED-A02-AT-REST | P1 | 🔴 подтв. | P1 | ПОДТВЕРЖДЕНО. Сканы медсправок и извлечённые из них поля (спецкатегория ПДн, 152-ФЗ ст.10; врачебная тайна, 323-ФЗ ст.13) хранятся БЕЗ прикладного шифрования at-rest: бинарь пишется в ФС через File.Cr | Сильнейший довод ПРОТИВ выставленной важности (не против факта): шифрование контента приложением — НЕ единственный и часто не предпочтительный контроль для at-rest, и у п |
+| audit-not-insert-only | P1 | 🔴 подтв. | P1 | Подтверждено (P1). Журнал аудита НЕ является INSERT-only на уровне БД — это лишь декларация в комментарии AuditLog.cs:6-7. Миграция InitialCreate.cs:62-81 создаёт audit_logs как обычную таблицу (колон | Сильнейший контр-довод: неизменяемость де-факто частично обеспечена на уровне приложения и среды, поэтому угроза реализуема не «по умолчанию», а лишь при привилегированно |
+| MED-A07-BOOTSTRAP | P2 | 🔴 подтв. | P2 | ПОДТВЕРЖДЕНО (P2, прод-риск латентный). Захардкоженный fallback-пароль `<демо-пароль>` присутствует буквально (DataSeeder.cs:45) и продублирован в обоих конфигах (appsettings.json:8, appsettings.Develo | Сильнейший довод против раздувания серьёзности: в базовом (продакшн) `appsettings.json` `BootstrapUser:Enabled = false` (строка 6), поэтому весь блок DataSeeder.cs:29-52  |
+| MED-A07-ENUM | P2 | 🔴 подтв. | P2 | Подтверждено (P2, минор). Сообщение о блокировке (Login.cshtml.cs:76-77) текстуально отличается от обобщённого ответа об обычной неудаче (строка 78) и срабатывает только для существующих учёток (Ident | Практическая ценность оракула близка к нулю в этом конкретном развёртывании, и это удерживает находку на минимуме: (1) Чтобы ВООБЩЕ увидеть сообщение о блокировке, атакую |
+| MED-A08-SHA | P2 | 🔴 подтв. | P2 | ПОДТВЕРЖДЕНО (P2). SHA-256 скана вычисляется один раз при загрузке (FileScanStorage.SaveAsync, FileScanStorage.cs:25-42) и сохраняется в CertificateScan.Sha256 (ScanService.cs:61), но при чтении (Open | Сильнейший довод против значимости (не против фактов): это не обход существующего контроля целостности, а ОТСУТСТВИЕ детективного контроля как фичи — хеш нигде не являетс |
+| MED-A09-IMMUTABLE | P1 | 🔴 подтв. | P2 | ПОДТВЕРЖДЕНО (с понижением до P2). Таблица audit_logs — обычная таблица без схемной защиты от изменения/удаления: только PK_audit_logs и индексы (InitialCreate.cs:62-81), нет REVOKE UPDATE/DELETE, нет | Сильнейший довод ПРОТИВ серьёзности: (1) на уровне приложения РСБ де-факто append-only — нет ни одного пути UPDATE/DELETE по AuditLogs, query-сервис read-only, так что "м |
+| no-page-roles | P1 | 🔴 подтв. | P2 | ПОДТВЕРЖДЕНО (с понижением до P2). Ролевая модель из трёх ролей (Teacher/HeadOfDepartment/Admin) объявлена, но к Razor-страницам не применяется: единственная страничная конвенция — `AuthorizeFolder("/ | Сильнейший контр-довод против заявленной severity P1: (1) Evidence частично неточен — claim ссылается на «Program.cs:19-25» и утверждает, что file-эндпоинт скана не разгр |
+| secrets-committed-appsettings | P1 | 🔴 подтв. | P2 | ПОДТВЕРЖДЕНО фактически, severity снижен P1→P2. Все 6 заявленных мест существуют дословно (одна опечатка: Development.json — строка 6, а не 7), оба appsettings закоммичены в git и не в .gitignore, так | Сильнейший довод против завышения severity: (1) пароль БД — это дефолтный PostgreSQL `postgres`/`postgres` на `localhost`, то есть не «утёкший боевой секрет», а локальный |
+| like-wildcard-injection | P2 | 🔴 подтв. | none | LIKE-wildcard «injection» в поиске реестра ФИО ПОДТВЕРЖДЕНА фактически (RegistryQueryService.cs:39 — Like без escape, Normalize не экранирует `%`/`_`), но это НЕ уязвимость безопасности: значение пара | Сильнейший довод против существенности: «обход сужения поиска» не даёт атакующему НИЧЕГО, что ему уже не доступно. (1) Эндпоинт под `AuthorizeFolder("/")` и доступен толь |
+| MED-A01-BOLA-SCAN | P0 | 🟡 частично | P2 | ЧАСТИЧНО ПОДТВЕРЖДЕНО как hardening-замечание P2, НЕ P0. Факт верен: ScanService.OpenAsync/GetAsync (ScanService.cs:87,98) и GET /scans/{id}/file (Program.cs:96) разграничивают доступ только по роли с | Классический BOLA требует субъекта более низкой привилегии, который сменой object-id поднимается к чужому объекту в обход горизонтальной изоляции. Здесь такого субъекта Н |
+| MED-A01-REVIEW | P1 | 🟡 частично | P2 | Подтверждено фактически, severity понижена P1→P2. Любой аутентифицированный СОТРУДНИК может Approve/Reject/Create справку и смотреть список сканов любого студента без вторичной проверки (CertificateSe | Сильнейший контр-довод: finding описывает обход object-level-авторизации, которой в v1 не существует и не предполагается. Нет ни связи AppUser↔Teacher (AppUser.cs не соде |
+| MED-A05-CSP | P2 | 🟡 частично | P2 | CSP действительно содержит script-src 'self' 'unsafe-inline' и style-src 'self' 'unsafe-inline' (Program.cs:52-54) — цитата верна, заголовки присутствуют. Но «нивелирование анти-XSS защиты» в текущем  | 'unsafe-inline' для script-src в данном приложении не ослабляет реальную анти-XSS защиту, потому что нивелировать нечего: CSP — это вторичный (defense-in-depth) барьер, к |
+| MED-A05-SECRETS | P1 | 🟡 частично | P2 | Подтверждено фактически (partial — переоценка серьёзности). Строка подключения в appsettings.json:3 и hardcoded-fallback в DependencyInjection.cs:24-25/ApplicationDbContextFactory.cs:12 используют суп | Серьёзность как «утечка секрета» (A05/секрет в открытом виде, P1) завышена и неправильно классифицирована. (1) Это `Host=localhost` дефолт со стандартной dev-пустышкой `p |
+| MED-A06-NUGET | P2 | 🟡 частично | P2 | Версии подтверждены дословно во всех .csproj: EF Core/Npgsql-провайдер/Identity.EFCore/EFCore.Design = 8.0.4, Serilog.AspNetCore = 8.0.1, FluentValidation.AspNetCore = 11.3.0 (deprecated-пакет). CPM/l | Сильнейший контр-довод: «прибито к 8.0.4» создаёт впечатление замороженной security-поверхности, но это не так. Рантайм ASP.NET Core подключён через FrameworkReference (I |
+| MED-A07-COOKIE | P1 | 🟡 частично | P2 | Cookie аутентификации не конфигурирует флаги явно (DependencyInjection.cs:44-49) — применяются дефолты Identity .NET 8: HttpOnly=true (ок), SameSite=Lax, SecurePolicy=SameAsRequest (не Always). Сам по | Сильнейший довод против P1: остроту claim снимает связка app.UseHttpsRedirection() (Program.cs:67) + app.UseHsts() (Program.cs:58-62) + UseForwardedHeaders с XForwardedPr |
+| config-sql-roster | P2 | 🟡 частично | P2 | Finding частично подтверждён как набор фактов, но завышен и неверно классифицирован как Injection. Реальная картина: (1) SqlRosterSource действительно выполняет запрос из конфига (SqlRosterSource.cs:2 | Сильнейший довод против вывода: ни один из трёх подпунктов не является injection-уязвимостью, под которую заведён finding (dimension=Injection). (а) `Sql.Query` — это ста |
+| csrf-default-only | P2 | 🟡 частично | P2 | Заявление о «CSRF только на дефолте = пробел» ОПРОВЕРГНУТО: Razor Pages валидирует antiforgery на всех POST по умолчанию, все формы используют tag-helper (токен инжектится), logout-форма имеет явный @ | Сильнейший довод против finding: CSRF-защита в этом приложении НЕ «держится только на дефолте» в смысле дыры — она полноценно активна. Razor Pages включает antiforgery-ва |
+| host-header-allowedhosts-wildcard | P1 | 🟡 частично | P2 | AllowedHosts="*" подтверждён (appsettings.json:21), но заявленная цепочка импакта НЕ ПОДТВЕРЖДАЕТСЯ кодом и понижается до P2 (hardening). Опровергнуты ключевые пункты evidence находки: UseForwardedHea | Сильнейший довод против находки: эксплуатируемость Host-header injection почти полностью зависит от того, отражает ли приложение Host в исходящий артефакт (редирект-Locat |
+| iframe-samesite-none-csrf | P1 | 🟡 частично | P2 | PARTIAL (severity понижена P1→P2). Находка описывает не текущий дефект, а условный риск гипотетической iframe-интеграции, которая в проекте уже отвергнута (рекомендация — отдельный поддомен med.rea.ru | Сильнейший довод против вывода: находка описывает не дефект кода, а свойство гипотетической архитектуры (iframe-встраивание), которая в проекте ОТВЕРГНУТА в пользу поддом |
+| no-av-scan | P1 | 🟡 частично | P2 | Антивирусной проверки загруженных файлов нет (ClamAV/AMSI/любой AV-интерфейс отсутствуют — подтверждено grep). Однако вопреки формулировке finding файл проходит контроль на загрузке: аллой-лист типов  | Сильнейший контр-довод против исходной P1-формулировки: для студенческой офлайн-ИС кафедры с ~13 операторами-сотрудниками, развёрнутой в периметре РЭУ без публичного дост |
+| no-page-resolution-limit-on-intake | P2 | 🟡 частично | P2 | Подтверждён только факт отсутствия лимитов страниц/разрешения/пикселей в ScanStorageOptions (есть лишь MaxUploadBytes 10 МБ + whitelist типов + серверная проверка сигнатуры). Однако заявленная амплифи | Сильнейший довод против находки: заявленная цепочка «нет лимита страниц → poppler-resource-exhaustion-dos» структурно неверна, потому что pdftoppm вызывается с -singlefil |
+| no-security-ci-pipeline | P1 | 🟡 частично | P2 | Подтверждено частично. На уровне проекта нет CI (.github/ отсутствует), нет Dockerfile/.editorconfig, нет блокирующего гейта качества/безопасности и нет ни одного стороннего SAST-анализатора (Security | Сильнейший контраргумент против вывода в его буквальной формулировке: (1) Roslyn-анализаторы безопасности НЕ «выключены» — в .NET 8 EnableNETAnalyzers по умолчанию true,  |
+| ollama-plaintext-http-tailscale | P1 | 🟡 частично | P2 | ПОДТВЕРЖДЕНО ЧАСТИЧНО (severity снижена P1→P2). Канал OCR действительно идёт обычным HTTP без прикладного TLS: base64-изображение медсправки (спецкатегория ПДн, 152-ФЗ ст.10 + врачебная тайна 323-ФЗ с | Сильнейший контр-довод: транспорт НЕ является открытым. Адрес <tailscale-ip> принадлежит CGNAT-диапазону Tailscale (100.64.0.0/10), а Tailscale — это mesh-WireGuard, котор |
+| poppler-resource-exhaustion-dos | P1 | 🟡 частично | P2 | Подтверждён технический дефект как P2 (hardening), не P1. pdftoppm в RenderPdfFirstPageAsync запускается без cgroup/ulimit, без -scale-to/клампа DPI и без валидации числа/габаритов страниц; при отмене | Путь по умолчанию выключен (Provider=Manual; LocalOllamaRecognitionProvider не регистрируется в DI, DependencyInjection.cs:74-77); когда включён — достижим лишь трём прив |
+| poppler-untrusted-parsing-rce | P1 | 🟡 частично | P2 | Подтверждено условно (partial). Реальный латентный риск: pdftoppm (poppler) разбирает недоверенный, загруженный студентом PDF без какой-либо изоляции (нет sandbox/seccomp/отдельного UID/лимитов ресурс | Сильнейший довод против находки: в дефолтной/боевой конфигурации этот код вообще мёртв — Provider="Manual" по умолчанию, ManualRecognitionProvider не трогает poppler, а a |
+| sso-oauth-validation | P1 | 🟡 частично | P2 | Фактаж находки ВЕРЕН и подтверждён по коду: SSO/OAuth2/OIDC/Bitrix полностью отсутствуют — аутентификация только локальная cookie-Identity (DependencyInjection.cs:30-49, CurrentUser.cs:14-21, единстве | Сильнейший довод против того, чтобы держать это как актуальную P1-уязвимость: уязвимости «слабая/отсутствующая валидация SSO-токена» не может быть там, где SSO-кода нет н |
+| MED-A03-LIKE | P2 | 🟡 частично | none | Подтверждено фактически, но severity снижена с P2 до none (информационное замечание о корректности поиска, не security-уязвимость). В RegistryQueryService.SearchAsync символы `%`/`_` из поискового вво | Сильнейший довод против вывода: находка маскирует функциональный дефект поиска под уязвимость класса Injection. Реальной инъекции нет — `EF.Functions.Like` всегда парамет |
+| MED-A05-HOSTS | P2 | 🟡 частично | none | MED-A05-HOSTS — PARTIAL (severity снижен P2 → none/info). Подтверждается лишь конфиг-факт: appsettings.json:21 `"AllowedHosts": "*"` (валидация Host выключена). Однако заявленная цепочка риска в текущ | Сильнейший довод против finding: заявленный риск host-header poisoning не реализуем в этой кодовой базе, потому что приложение не порождает ни одной абсолютной ссылки из  |
+
+
+---
+
+# Блок 4. Стек портала РЭУ и варианты интеграции
 У меня собран полный набор первоисточников. Критическое уточнение подтверждено: student.rea.ru = "1С-Битрикс: Управление сайтом" (БУС, не Bitrix24), и REST-модуль в БУС доступен с версии 16.6.0. Это меняет картину SSO. Формирую финальный отчёт.
 
 ---
@@ -1758,7 +1925,6 @@ nginx/Битрикс-фронт проксирует префикс `/medspravki
 ---
 
 # Блок 5. Авторизация препод/студент и матрица доступа к справкам
-
 Это задача документирования/проектирования — без чтения исходников она решается на основе уже предоставленных КОД-ФАКТОВ и Блока 4. Дам ответ напрямую.
 
 # БЛОК 5. Авторизация в портале РЭУ и матрица доступа к медсправкам
@@ -1913,7 +2079,6 @@ nginx/Битрикс-фронт проксирует префикс `/medspravki
 ---
 
 # Блок 6. Что видит студент и что видит преподаватель
-
 I now have the complete domain model. I have everything needed to compose the deliverable — the exact statuses, groups, fields, and the medical/internal fields that must be hidden per role.
 
 ---

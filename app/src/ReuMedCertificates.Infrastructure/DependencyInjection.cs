@@ -79,6 +79,9 @@ public static class DependencyInjection
         else
             services.AddScoped<IDocumentRecognitionService, ManualRecognitionProvider>();
 
+        // Двухэтапное распознавание (zoom по полям) — рендер/кроп страницы + точечный запрос к модели.
+        services.AddScoped<IRegionRecognizer, RegionRecognizer>();
+
         services.AddScoped<IRegistryQueryService, RegistryQueryService>();
         services.AddScoped<IStudentService, StudentService>();
         services.AddScoped<ICertificateService, CertificateService>();

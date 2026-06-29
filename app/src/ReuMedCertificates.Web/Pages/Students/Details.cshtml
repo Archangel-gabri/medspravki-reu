@@ -43,11 +43,20 @@
         {
             foreach (var c in s.Current)
             {
-                var cls = StatusDisplay.CertClass(c.Status);
+                var cls = c.Admitted ? StatusDisplay.CertClass(c.Status) : "danger";
                 <div class="row-status @cls" style="border-left-width:4px; padding-left:12px; margin-bottom:14px">
-                    <span class="badge @cls"><span class="dot"></span>@StatusDisplay.CertText(c.Status)</span>
+                    @if (!c.Admitted)
+                    {
+                        <span class="badge danger"><span class="dot"></span>Не допущен</span>
+                        <span class="badge @StatusDisplay.CertClass(c.Status)" style="margin-left:6px"><span class="dot"></span>@StatusDisplay.CertText(c.Status)</span>
+                    }
+                    else
+                    {
+                        <span class="badge @cls"><span class="dot"></span>@StatusDisplay.CertText(c.Status)</span>
+                    }
                     <dl class="kv" style="margin-top:10px">
                         <dt>Тип</dt><dd>@StatusDisplay.CertType(c.Type)</dd>
+                        <dt>Допуск</dt><dd>@(c.Admitted ? "Допущен" : "НЕ допущен (по справке)")</dd>
                         <dt>Срок действия</dt><dd>@c.StartDate.ToString("dd.MM.yyyy") – @c.EndDate.ToString("dd.MM.yyyy")</dd>
                         <dt>Группа здоровья</dt><dd>@if (c.HealthGroup == HealthGroup.Unknown) { <text>не указана</text> } else { <strong>@StatusDisplay.HealthGroup(c.HealthGroup)</strong> <text>группа</text> }</dd>
                         @if (c.PhysicalGroup != PhysicalEducationGroup.None)
@@ -59,6 +68,9 @@
                         <dt>Мед. организация</dt><dd>@(c.MedicalOrganization ?? "—")</dd>
                         <dt>Проверка</dt><dd><span class="pill">@StatusDisplay.Verification(c.VerificationStatus)</span></dd>
                     </dl>
+                    <div style="margin-top:10px">
+                        <a class="btn btn-sm btn-primary" href="/students/@s.Id/certificates/@c.Id/edit">Изменить / поправить</a>
+                    </div>
                     @if (c.VerificationStatus == VerificationStatus.Verified)
                     {
                         <form method="post" asp-page-handler="Revoke" style="margin-top:10px; display:flex; gap:8px; align-items:center; flex-wrap:wrap">
@@ -76,7 +88,7 @@
             <h2 style="margin-top:18px">История справок</h2>
             <div class="table-wrap">
                 <table class="grid">
-                    <thead><tr><th>Срок</th><th>Физ. группа</th><th>Ограничения</th><th>Статус</th></tr></thead>
+                    <thead><tr><th>Срок</th><th>Физ. группа</th><th>Ограничения</th><th>Статус</th><th></th></tr></thead>
                     <tbody>
                     @foreach (var c in s.History)
                     {
@@ -86,6 +98,7 @@
                             <td>@StatusDisplay.PhysicalGroup(c.PhysicalGroup)</td>
                             <td class="dim">@(string.IsNullOrWhiteSpace(c.Restrictions) ? "—" : c.Restrictions)</td>
                             <td><span class="badge @cls"><span class="dot"></span>@StatusDisplay.CertText(c.Status)</span></td>
+                            <td><a class="btn btn-sm" href="/students/@s.Id/certificates/@c.Id/edit">Изменить</a></td>
                         </tr>
                     }
                     </tbody>

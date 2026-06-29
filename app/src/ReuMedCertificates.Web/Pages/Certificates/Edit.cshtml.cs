@@ -7,12 +7,12 @@ using ReuMedCertificates.Domain.Enums;
 
 namespace ReuMedCertificates.Web.Pages.Certificates;
 
-public class CreateModel : PageModel
+public class EditModel : PageModel
 {
     private readonly ICertificateService _certificates;
     private readonly IStudentService _students;
 
-    public CreateModel(ICertificateService certificates, IStudentService students)
+    public EditModel(ICertificateService certificates, IStudentService students)
     {
         _certificates = certificates;
         _students = students;
@@ -20,6 +20,7 @@ public class CreateModel : PageModel
 
     [BindProperty] public InputModel Input { get; set; } = new();
     public Guid StudentId { get; private set; }
+    public Guid CertificateId { get; private set; }
     public string StudentName { get; private set; } = string.Empty;
     public string? ErrorMessage { get; private set; }
 
@@ -37,7 +38,8 @@ public class CreateModel : PageModel
         public DateOnly? IssueDate { get; set; }
 
         public CertificateType Type { get; set; } = CertificateType.Standard086;
-        public PhysicalEducationGroup PhysicalGroup { get; set; } = PhysicalEducationGroup.Basic;
+        public bool Admitted { get; set; } = true;
+        public PhysicalEducationGroup PhysicalGroup { get; set; } = PhysicalEducationGroup.None;
         public HealthGroup HealthGroup { get; set; } = HealthGroup.Unknown;
         public string? CertificateNumber { get; set; }
         public string? MedicalOrganization { get; set; }
@@ -45,43 +47,53 @@ public class CreateModel : PageModel
         public string? Comment { get; set; }
     }
 
-    public async Task<IActionResult> OnGetAsync(Guid id, CancellationToken cancellationToken)
+    public async Task<IActionResult> OnGetAsync(Guid id, Guid certId, CancellationToken cancellationToken)
     {
         var student = await _students.GetDetailAsync(id, cancellationToken);
-        if (student is null)
-            return NotFound();
+        if (student is null) return NotFound();
+
+        var cert = student.Current.Concat(student.History).FirstOrDefault(c => c.Id == certId);
+        if (cert is null) return NotFound();
 
         StudentId = student.Id;
+        CertificateId = certId;
         StudentName = student.FullName;
-        Input.StartDate = DateOnly.FromDateTime(DateTime.UtcNow);
-        Input.EndDate = Input.StartDate.AddYears(1);
+
+        Input = new InputModel
+        {
+            StartDate = cert.StartDate,
+            EndDate = cert.EndDate,
+            IssueDate = cert.IssueDate,
+            Type = cert.Type,
+            Admitted = cert.Admitted,
+            PhysicalGroup = cert.PhysicalGroup,
+            HealthGroup = cert.HealthGroup,
+            CertificateNumber = cert.CertificateNumber,
+            MedicalOrganization = cert.MedicalOrganization,
+            Restrictions = cert.Restrictions,
+            Comment = cert.Comment
+        };
         return Page();
     }
 
-    public async Task<IActionResult> OnPostAsync(Guid id, CancellationToken cancellationToken)
+    public async Task<IActionResult> OnPostAsync(Guid id, Guid certId, CancellationToken cancellationToken)
     {
         var student = await _students.GetDetailAsync(id, cancellationToken);
-        if (student is null)
-            return NotFound();
+        if (student is null) return NotFound();
 
         StudentId = student.Id;
+        CertificateId = certId;
         StudentName = student.FullName;
 
-        if (!ModelState.IsValid)
-            return Page();
+        if (!ModelState.IsValid) return Page();
 
         try
         {
-            var request = new AddCertificateRequest(
-                id, Input.StartDate, Input.EndDate, Input.IssueDate,
-                Input.HealthGroup, Input.PhysicalGroup,
-                string.IsNullOrWhiteSpace(Input.Restrictions) ? null : Input.Restrictions.Trim(),
-                string.IsNullOrWhiteSpace(Input.Comment) ? null : Input.Comment.Trim(),
-                string.IsNullOrWhiteSpace(Input.CertificateNumber) ? null : Input.CertificateNumber.Trim(),
-                string.IsNullOrWhiteSpace(Input.MedicalOrganization) ? null : Input.MedicalOrganization.Trim(),
-                Input.Type);
-
-            await _certificates.AddAsync(request, cancellationToken);
+            await _certificates.UpdateAsync(new EditCertificateRequest(
+                certId, Input.StartDate, Input.EndDate, Input.IssueDate,
+                Input.HealthGroup, Input.PhysicalGroup, Input.Type, Input.Admitted,
+                Input.CertificateNumber, Input.MedicalOrganization, Input.Restrictions, Input.Comment),
+                cancellationToken);
             return Redirect($"/students/{id}");
         }
         catch (InvalidOperationException ex)

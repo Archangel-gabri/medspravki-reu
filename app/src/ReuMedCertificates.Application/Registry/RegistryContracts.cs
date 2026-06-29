@@ -12,7 +12,7 @@ public sealed record RegistryFilter(
     int Page = 1,
     int PageSize = 50);
 
-/// <summary>Строка реестра: студент + его допуск (только по ПРОВЕРЕННОЙ справке).</summary>
+/// <summary>Строка реестра: студент + его допуск (агрегат по ПРОВЕРЕННЫМ справкам).</summary>
 public sealed record RegistryRow(
     Guid StudentId,
     string FullName,
@@ -22,11 +22,14 @@ public sealed record RegistryRow(
     string? Teacher,
     PhysicalEducationGroup PhysicalGroup,
     HealthGroup HealthGroup,
+    IReadOnlyList<CertificateType> Types,
     string? Restrictions,
     DateOnly? StartDate,
     DateOnly? EndDate,
     CertificateStatus? Status,
-    bool HasPendingReview);
+    bool HasPendingReview,
+    bool NotAdmitted,
+    bool HasRejectedScan);
 
 public sealed record RegistryPage(IReadOnlyList<RegistryRow> Rows, int Total, int Page, int PageSize);
 

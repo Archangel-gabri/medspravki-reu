@@ -15,7 +15,8 @@ public sealed record CertificateView(
     string? Comment,
     CertificateStatus Status,
     VerificationStatus VerificationStatus,
-    CertificateType Type);
+    CertificateType Type,
+    bool Admitted);
 
 public sealed record StudentDetail(
     Guid Id,
