@@ -13,9 +13,10 @@
 ## Статус на 2026-08-10
 
 **Проект на паузе, но живой и развёрнутый.** Последний коммит с кодом — `e47cac2` от **2026-06-29**
-(`ui(medspravki): убраны ручные кнопки ИИ у препода`). После него репозиторий трогали только
-инфраструктурно (`23e1a28`, 2026-07-21 — паспорт `.proeb/project.json`). Последняя сессия по проекту —
-2026-07-14. То есть **~6 недель без изменений кода**.
+(`ui(medspravki): убраны ручные кнопки ИИ у препода`). После него кода не касались: `be682a2`
+(2026-07-05) завёл в git `ONBOARDING.md` и `_source/`, `23e1a28` (2026-07-21) — паспорт
+`.proeb/project.json`, `ec44817` и `07a16e3` (2026-08-10) — этот README. Последняя сессия,
+где проект был основным, — 2026-07-14. То есть **~6 недель без изменений кода**.
 
 Что проверено прямо сейчас (2026-08-10, на этой машине, .NET SDK 8.0.127):
 
@@ -31,8 +32,9 @@
 - карточка студента `/students/{id}` — текущая справка, история, правка
   `/students/{id}/certificates/{certId}/edit`, отзыв допуска;
 - экран «Перед парой» `/before-class`;
-- личный кабинет студента `/me` с загрузкой скана; загрузка преподавателем `/students/{id}/scans`;
-  склейка нескольких фото в один PDF;
+- личный кабинет студента `/me` — до 5 файлов за раз, несколько фото склеиваются в один PDF
+  (`ImageMagickDocumentAssembler`); загрузка преподавателем `/students/{id}/scans` — **по одному файлу**,
+  без склейки;
 - фоновое ИИ-распознавание (двухэтапное + голосование по дате), ручной зум по полю
   `/students/{id}/scans/{scanId}/zoom`;
 - очередь заявок `/review` и `/submissions`, журнал аудита `/journal`, импорт реестра `/import`.
@@ -161,7 +163,13 @@ sudo systemctl restart reu-medspravki
 - `pdftoppm` (poppler) — рендер PDF в изображение;
 - `magick` (ImageMagick 7) с фолбэком на `convert` — склейка фото в PDF, кроп, предобработка.
 
-Если их нет — распознавание тихо деградирует (`RunAsync` ловит исключение и пишет warning в лог), а не падает.
+Если их нет, поведение **не единообразно мягкое**. Вызовы `magick`/`convert` в предобработке и кропе идут
+через `RunAsync` — тот ловит исключение, пишет warning и возвращает `false`, шаг просто пропускается.
+А `pdftoppm` запускается напрямую (`LocalOllamaRecognitionProvider.cs:422`, `RegionRecognizer.cs:76`) и
+без poppler бросает: авто-проверка скана падает целиком, исключение глотает только
+`ScanProcessingBackgroundService` (`LogError`, «Авто-проверка скана … не удалась»). Склейка фото в PDF без
+ImageMagick бросает `InvalidOperationException` (`ImageMagickDocumentAssembler.cs:36`), а
+`Pages/Me/Index.cshtml.cs` её не ловит — студент получит 500. Само приложение при этом живо.
 
 ---
 
@@ -208,7 +216,10 @@ app/tests/
 пришли данные — ортогонально. Статус по сроку (`CertificateStatus`: Upcoming/Active/ExpiringSoon/EndsToday/Expired)
 **не хранится в БД**, считается на лету в `MedicalCertificate.GetStatus()`.
 
-**Конфигурация** (`appsettings.json` + `appsettings.Development.json`):
+**Конфигурация.** Осторожно: в `appsettings.json` лежат только `ConnectionStrings`, `BootstrapUser`
+(`Enabled: false`), `ExpiringSoonThresholdDays`, `Serilog`, `AllowedHosts`. Секции `Scans` и `Recognition`
+есть **только** в `appsettings.Development.json`, а секции `Roster` нет ни в одном файле — она целиком
+живёт на дефолтах класса `Application/Common/RosterOptions.cs`. Полный набор ключей, которые читает код:
 
 - `ConnectionStrings:DefaultConnection`, `BootstrapUser`, `SeedDemoData`, `ExpiringSoonThresholdDays` (7);
 - `Scans` — `StoragePath`, `MaxUploadBytes` (10 МБ), `AllowedContentTypes` (PDF/JPEG/PNG), до 5 файлов в запросе;
@@ -266,7 +277,8 @@ app/tests/
   Внутри тайнета/по SSH сайт доступен всегда. Подробности — `ONBOARDING.md` §7.
 - **Рабочая копия на боевом ПК не под git.** `/home/Castiel/app` — без истории и отката (см. `ONBOARDING.md` §8).
   В этом вольте лежит **своя** копия (`app/`, 125 файлов под git) — легко разъехаться. Не путать также
-  дев-инстанс на ноуте (свой `reu-pg` на localhost:5080) с боевым на `castiel-pc`.
+  дев-инстанс на ноуте (свой контейнер `reu-pg` на 5432 + приложение на localhost:5080) с боевым на
+  `castiel-pc`.
 - **7B-модель ошибается на рукописи** — даты, номер, группа. Из-за этого и появилась кнопка
   «Изменить / поправить»: правка преподавателем = подтверждение человеком (→ `Verified`).
   Подделку модель не ловит — это первый фильтр и автозаполнение, а не проверка подлинности.
@@ -299,7 +311,14 @@ app/tests/
 | `docs/SECURITY-COMPLIANCE-RESEARCH-2026-06-16.md` | разбор 152-ФЗ / 323-ФЗ и модель безопасности (~380 КБ) |
 | `_source/inputs/` | оба ТЗ (md) + исходный docx заказчика |
 | `_source/mockups/`, `_source/sample-certs/` | фото «Расписания» кафедры, рисованный вайрфрейм, образец справки 086/у |
-| `assets/concepts/`, `assets/screenshots/` | 4 фронт-концепта (принят №1 «Кафедральный синий») и скриншоты живого UI |
+| `assets/concepts/`, `assets/screenshots/` | 4 фронт-концепта (рекомендован был №1 «Кафедральный синий», но в код он не пошёл — см. ниже) и скриншоты живого UI |
 
-Фронт: концепт «Кафедральный синий», палитра `#EAF1F9 #1F5BA8 #0E3A6B #1F2A37 #2E9E5B #C9342E`,
-Razor Pages + HTMX + Bootstrap 5.3.
+**Фронт — свой CSS без фреймворков.** Единственный файл стилей `app/src/ReuMedCertificates.Web/wwwroot/css/site.css`
+описан в шапке как «Тема РЭУ им. Г.В. Плеханова — 1:1 с порталом student.rea.ru»: PT Sans, тёмно-синий
+`#0B2D50`, контейнер 980px. **HTMX и Bootstrap в коде отсутствуют** — ни пакета, ни CDN, ни одного
+атрибута `hx-*`; во всём `wwwroot/` лежат ровно два файла (`css/site.css`, `images/reu-logo.svg`).
+HTMX + Bootstrap 5.3 стоят в стеке архитектурного документа `_source/inputs/02_Подробное_техническое_ТЗ…md`
+(строки 68–69) и в `CLAUDE.md` — но в официальном ТЗ v1 их нет, и в коде их нет: это план. Концепт «Кафедральный
+синий» был вытеснен темой РЭУ ещё в июне (`2672a8d`, `1a28ba0`, `3095d6c`): из его палитры
+`#EAF1F9 #1F5BA8 #0E3A6B #1F2A37 #2E9E5B #C9342E` в `site.css` дожили только `#2e9e5b` (ок) и
+`#c9342e` (опасность).
