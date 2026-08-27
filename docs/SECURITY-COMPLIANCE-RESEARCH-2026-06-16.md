@@ -1004,7 +1004,7 @@ docker run --rm -v "$APP_ROOT:/repo" trufflesecurity/trufflehog:latest git file:
 Что ОЖИДАЕМО найдётся (это не ложные срабатывания):
 - `app/src/ReuMedCertificates.Web/appsettings.json:3` — `Password=postgres` в connection string (P1, см. findings).
 - демо-пароль `<демо-пароль>` в `appsettings.json` и `appsettings.Development.json`, и как литерал-fallback в `DataSeeder.cs:45`.
-- `appsettings.Development.json:16` — приватный Tailscale-IP Ollama `<tailscale-ip>` (не секрет, но инфраструктурная утечка).
+- `appsettings.Development.json:16` — приватный Tailscale-IP Ollama `<tailscale-ip-узла>` (не секрет, но инфраструктурная утечка).
 
 Превентивно — pre-commit hook gitleaks (в этом vault gitleaks-хук на коммит уже активен по CLAUDE.md; убедись, что он покрывает и эту папку):
 
@@ -1129,7 +1129,7 @@ pipx install sslyze   # или: pip install --user sslyze
 sslyze --json_out "$OUT/sslyze.json" med.rea.ru:443
 ```
 
-Отдельно — **TLS до Ollama**: сейчас OCR-данные (спецкатегория ПДн) идут по `http://<tailscale-ip>:11434` без TLS внутри Tailscale (`appsettings.Development.json:16`). Tailscale шифрует транспорт WireGuard'ом, но приложение об этом не знает — это процессно-архитектурная находка (см. findings). Проверка факта:
+Отдельно — **TLS до Ollama**: сейчас OCR-данные (спецкатегория ПДн) идут по `http://<tailscale-ip-узла>:11434` без TLS внутри Tailscale (`appsettings.Development.json:16`). Tailscale шифрует транспорт WireGuard'ом, но приложение об этом не знает — это процессно-архитектурная находка (см. findings). Проверка факта:
 
 ```bash
 grep -rn "OllamaUrl\|http://" "$CODE"/*/appsettings*.json
@@ -1368,7 +1368,7 @@ curl -skI -b "$OUT/a.jar" "https://localhost:5080/scans/<GUID_ДРУГОГО>/fi
 
 **A01 Broken Access Control — ЕСТЬ ПРОБЛЕМА (главная).** Авторизация только на уровне папки: `Program.cs:25` `AuthorizeFolder("/")` требует лишь *аутентификации*, без ролей. Единственная ролевая проверка — minimal-API `/scans/{id}/file` (`Program.cs:96` RequireRole Teacher/HeadOfDepartment/Admin). Ни одна Razor-страница не несёт `[Authorize(Roles=…)]`: `Journal/Index.cshtml.cs`, `Import/Index.cshtml.cs`, `Review/Index.cshtml.cs` (Approve/Reject), `Certificates/Create.cshtml.cs`, `Students/Details.cshtml.cs`, `Scans/Index.cshtml.cs` (список/загрузка/распознавание) доступны ЛЮБОМУ вошедшему. Object-level scope (BOLA) отсутствует на всех уровнях: `ScanService.OpenAsync` (`ScanService.cs:85-94`) и `GetAsync` ищут скан только по `scanId`, без проверки владельца/преподавателя студента; `CertificateService.ApproveAsync/RejectAsync` (`CertificateService.cs:85-127`) — только по `certificateId`. В v1 (только сотрудники Admin+Teacher) риск СМЯГЧЁН доверенным персоналом в ЛВС, но при появлении роли Student (план v2) это мгновенно превращается в полное BOLA-раскрытие спецкатегории ПДн. (MED-A01-FOLDER, MED-A01-BOLA-SCAN, MED-A01-REVIEW)
 
-**A02 Cryptographic Failures — ЕСТЬ ПРОБЛЕМА (смягчено).** Сканы медсправок (спецкатегория ПДн ст.10 152-ФЗ + врачебная тайна) хранятся в ФС в открытом виде, без шифрования at-rest (`FileScanStorage.cs:29` `File.Create`). Канал к Ollama — `http://<tailscale-ip>:11434` (`appsettings.Development.json:16`), плейн-текст по Tailscale (Tailscale = WireGuard-шифрование на транспорте, смягчает). Пароли — корректный Identity-хеш (PBKDF2). (MED-A02-AT-REST)
+**A02 Cryptographic Failures — ЕСТЬ ПРОБЛЕМА (смягчено).** Сканы медсправок (спецкатегория ПДн ст.10 152-ФЗ + врачебная тайна) хранятся в ФС в открытом виде, без шифрования at-rest (`FileScanStorage.cs:29` `File.Create`). Канал к Ollama — `http://<tailscale-ip-узла>:11434` (`appsettings.Development.json:16`), плейн-текст по Tailscale (Tailscale = WireGuard-шифрование на транспорте, смягчает). Пароли — корректный Identity-хеш (PBKDF2). (MED-A02-AT-REST)
 
 **A03 Injection — СМЯГЧЕНО / частично.** SQL-инъекций нет: EF Core параметризует значения, LIKE использует параметр (`RegistryQueryService.cs:39`). НО user-ввод поиска интерполируется в LIKE-паттерн без экранирования `%`/`_` — `Student.Normalize` (`Student.cs:36-38`) только lower/trim, wildcards не вычищает → LIKE-wildcard abuse + обход GIN-индекса (sequential scan, мини-DoS). `SqlRosterSource.cs:27` гонит raw SQL из конфига (`_options.Sql.Query`) — это доверенный конфиг, не пользовательский ввод (low). Лог-инъекция Serilog: значения подставляются как структурированные параметры (`{Model}`, `{Count}`), но в `AuditLog.Description` кладётся интерполированный текст с именами файлов/ФИО — в БД (jsonb/text) это безопасно, без CRLF-инъекции в файловые логи. (MED-A03-LIKE)
 
@@ -1475,7 +1475,7 @@ All facts confirmed. The `IpAddress` column exists but is never populated by `Au
 - Временные файлы: пишутся в системный temp (`:118-121`), удаляются в `finally` через `TryDelete` (`:141-151`); содержат PDF медсправки в открытом виде на время обработки.
 
 **Сеть / SSRF:**
-- POST на `$"{OllamaUrl.TrimEnd('/')}/api/generate"` (`:61-62`). `OllamaUrl` — **из конфига** (`Recognition:OllamaUrl`), не из пользовательского запроса; в Dev = `http://<tailscale-ip>:11434` (Tailscale, **http без TLS**) (`appsettings.Development.json:16`). Дефолт `http://localhost:11434` (`RecognitionOptions.cs:12`). Пользователь не управляет endpoint → прямого SSRF через ввод нет; запрос идёт по открытому HTTP в Tailscale-сеть.
+- POST на `$"{OllamaUrl.TrimEnd('/')}/api/generate"` (`:61-62`). `OllamaUrl` — **из конфига** (`Recognition:OllamaUrl`), не из пользовательского запроса; в Dev = `http://<tailscale-ip-узла>:11434` (Tailscale, **http без TLS**) (`appsettings.Development.json:16`). Дефолт `http://localhost:11434` (`RecognitionOptions.cs:12`). Пользователь не управляет endpoint → прямого SSRF через ввод нет; запрос идёт по открытому HTTP в Tailscale-сеть.
 - Изображение/PDF кодируется в base64 и уходит на Ollama (`:55`); тело справки (спецкатегория ПДн) передаётся по незашифрованному HTTP.
 - Таймаут HttpClient = `TimeoutSeconds` (`:42`, в Dev 180с).
 - Ошибка модели → текст исключения сохраняется в `RecognitionJson` (`ScanService.cs:144`) и может содержать детали.
@@ -1545,7 +1545,7 @@ All facts confirmed. The `IpAddress` column exists but is never populated by `Au
 - `SeedDemoData=true` (`:2`) — засевает 12 демо-студентов/справок + демо-журнал + демо-таблицу 1С (`DataSeeder.cs:56-62`).
 - `BootstrapUser:Enabled=true`, `Login="teacher"`, `Password="<демо-пароль>"` (`:3-8`) → создаётся учётка с ролями `Admin`+`Teacher` (`DataSeeder.cs:45-49`).
 - `Scans:StoragePath=App_Data/scans`, `MaxUploadBytes=10485760`, `AllowedContentTypes=[pdf,jpeg,png]` (`:9-13`).
-- `Recognition:Provider=LocalOllama`, `OllamaUrl=http://<tailscale-ip>:11434` (http, Tailscale), `VisionModel=qwen2.5vl:7b`, `TimeoutSeconds=180`, `PdfRenderDpi=200` (`:14-20`).
+- `Recognition:Provider=LocalOllama`, `OllamaUrl=http://<tailscale-ip-узла>:11434` (http, Tailscale), `VisionModel=qwen2.5vl:7b`, `TimeoutSeconds=180`, `PdfRenderDpi=200` (`:14-20`).
 
 **Демо-пароль `<демо-пароль>`:** задаётся в `appsettings.json:8` и `appsettings.Development.json:7`; используется в `DataSeeder.cs:45` (`bootstrap["Password"] ?? "<демо-пароль>"` — литерал-fallback прямо в коде). Креды 1С OData (`RosterOptions.cs:31-32`) — пустые по умолчанию, ожидаются из конфига.
 
@@ -1710,7 +1710,7 @@ All facts confirmed. The `IpAddress` column exists but is never populated by `Au
 | no-av-scan | P1 | 🟡 частично | P2 | Антивирусной проверки загруженных файлов нет (ClamAV/AMSI/любой AV-интерфейс отсутствуют — подтверждено grep). Однако вопреки формулировке finding файл проходит контроль на загрузке: аллой-лист типов  | Сильнейший контр-довод против исходной P1-формулировки: для студенческой офлайн-ИС кафедры с ~13 операторами-сотрудниками, развёрнутой в периметре РЭУ без публичного дост |
 | no-page-resolution-limit-on-intake | P2 | 🟡 частично | P2 | Подтверждён только факт отсутствия лимитов страниц/разрешения/пикселей в ScanStorageOptions (есть лишь MaxUploadBytes 10 МБ + whitelist типов + серверная проверка сигнатуры). Однако заявленная амплифи | Сильнейший довод против находки: заявленная цепочка «нет лимита страниц → poppler-resource-exhaustion-dos» структурно неверна, потому что pdftoppm вызывается с -singlefil |
 | no-security-ci-pipeline | P1 | 🟡 частично | P2 | Подтверждено частично. На уровне проекта нет CI (.github/ отсутствует), нет Dockerfile/.editorconfig, нет блокирующего гейта качества/безопасности и нет ни одного стороннего SAST-анализатора (Security | Сильнейший контраргумент против вывода в его буквальной формулировке: (1) Roslyn-анализаторы безопасности НЕ «выключены» — в .NET 8 EnableNETAnalyzers по умолчанию true,  |
-| ollama-plaintext-http-tailscale | P1 | 🟡 частично | P2 | ПОДТВЕРЖДЕНО ЧАСТИЧНО (severity снижена P1→P2). Канал OCR действительно идёт обычным HTTP без прикладного TLS: base64-изображение медсправки (спецкатегория ПДн, 152-ФЗ ст.10 + врачебная тайна 323-ФЗ с | Сильнейший контр-довод: транспорт НЕ является открытым. Адрес <tailscale-ip> принадлежит CGNAT-диапазону Tailscale (100.64.0.0/10), а Tailscale — это mesh-WireGuard, котор |
+| ollama-plaintext-http-tailscale | P1 | 🟡 частично | P2 | ПОДТВЕРЖДЕНО ЧАСТИЧНО (severity снижена P1→P2). Канал OCR действительно идёт обычным HTTP без прикладного TLS: base64-изображение медсправки (спецкатегория ПДн, 152-ФЗ ст.10 + врачебная тайна 323-ФЗ с | Сильнейший контр-довод: транспорт НЕ является открытым. Адрес <tailscale-ip-узла> принадлежит CGNAT-диапазону Tailscale (100.64.0.0/10), а Tailscale — это mesh-WireGuard, котор |
 | poppler-resource-exhaustion-dos | P1 | 🟡 частично | P2 | Подтверждён технический дефект как P2 (hardening), не P1. pdftoppm в RenderPdfFirstPageAsync запускается без cgroup/ulimit, без -scale-to/клампа DPI и без валидации числа/габаритов страниц; при отмене | Путь по умолчанию выключен (Provider=Manual; LocalOllamaRecognitionProvider не регистрируется в DI, DependencyInjection.cs:74-77); когда включён — достижим лишь трём прив |
 | poppler-untrusted-parsing-rce | P1 | 🟡 частично | P2 | Подтверждено условно (partial). Реальный латентный риск: pdftoppm (poppler) разбирает недоверенный, загруженный студентом PDF без какой-либо изоляции (нет sandbox/seccomp/отдельного UID/лимитов ресурс | Сильнейший довод против находки: в дефолтной/боевой конфигурации этот код вообще мёртв — Provider="Manual" по умолчанию, ManualRecognitionProvider не трогает poppler, а a |
 | sso-oauth-validation | P1 | 🟡 частично | P2 | Фактаж находки ВЕРЕН и подтверждён по коду: SSO/OAuth2/OIDC/Bitrix полностью отсутствуют — аутентификация только локальная cookie-Identity (DependencyInjection.cs:30-49, CurrentUser.cs:14-21, единстве | Сильнейший довод против того, чтобы держать это как актуальную P1-уязвимость: уязвимости «слабая/отсутствующая валидация SSO-токена» не может быть там, где SSO-кода нет н |

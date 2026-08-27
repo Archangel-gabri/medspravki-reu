@@ -151,7 +151,8 @@ sudo systemctl restart reu-medspravki
 
 **Вход.** Bootstrap-пользователь создаётся, если `BootstrapUser:Enabled = true` (получает роли
 `Admin` + `Teacher`). В `appsettings.json` он **выключен**, в `appsettings.Development.json` —
-**включён**, логин `teacher`, пароль — дефолтный `<демо-пароль>` из того же файла.
+**включён**, логин `teacher`, пароль — только из `BootstrapUser__Password` в окружении.
+> Значения пароля в репозитории нет намеренно: конфиг с ним уезжал в прод вместе со сборкой.
 `SeedDemoData = false` → **реестр стартует пустым, это норма**: демо-студентов и демо-логины
 `head`/`admin`/`student` сознательно убрали по просьбе заказчика. Справочники, которые сидятся
 **всегда** (`SeedReferenceDataAsync`, идемпотентно) — 9 высших школ и 76 преподавателей кафедры
@@ -265,7 +266,7 @@ app/tests/
   **Перед рисковыми правками БД делай дамп:**
   `docker exec reu-pg pg_dump -U postgres reu_med_certificates | gzip > ~/reu-pg-backup-$(date +%Y%m%d).sql.gz`
 - **Медданные на публичном адресе за дефолтным паролем.** Боевой контур — Tailscale **Funnel**, то есть
-  открытый интернет, а `BootstrapUser` — `teacher` / `<демо-пароль>` из `appsettings.Development.json`.
+  открытый интернет, а `BootstrapUser` — `teacher` с паролем из окружения (`BootstrapUser__Password`).
   Это спецкатегория ПДн (152-ФЗ ст. 10) + врачебная тайна (323-ФЗ ст. 13). Пароль надо сменить;
   альтернатива — приватный `tailscale serve` (только внутри тайнета).
 - **Прод крутится в окружении `Development`.** `ASPNETCORE_ENVIRONMENT` на сервисе — Development,

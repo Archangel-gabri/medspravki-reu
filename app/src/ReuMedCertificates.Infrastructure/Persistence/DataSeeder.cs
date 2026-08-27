@@ -51,7 +51,18 @@ public static class DataSeeder
                     CreatedAt = now,
                     UpdatedAt = now
                 };
-                var result = await userManager.CreateAsync(user, bootstrap["Password"] ?? "<демо-пароль>");
+                // Пароля по умолчанию нет намеренно: литерал в коде переживал любую
+                // смену конфига и уезжал в прод вместе со сборкой.
+                var bootstrapPassword = bootstrap["Password"];
+                if (string.IsNullOrWhiteSpace(bootstrapPassword))
+                {
+                    throw new InvalidOperationException(
+                        "BootstrapUser:Enabled=true, но BootstrapUser:Password не задан. " +
+                        "Задайте его через переменную окружения BootstrapUser__Password " +
+                        "или user-secrets — в конфиг репозитория пароль не кладём.");
+                }
+
+                var result = await userManager.CreateAsync(user, bootstrapPassword);
                 if (result.Succeeded)
                 {
                     await userManager.AddToRoleAsync(user, AppRoles.Admin);
@@ -345,7 +356,11 @@ public static class DataSeeder
                 UserName = login, Email = $"{login}@rea.ru", EmailConfirmed = true,
                 FullName = fullName, IsActive = true, CreatedAt = now, UpdatedAt = now
             };
-            if (!(await um.CreateAsync(user, "<демо-пароль>")).Succeeded) return;
+            // Демо-пользователи заводятся только под SeedDemoData; пароль берётся
+            // из окружения, чтобы в репозитории не лежало ничего, чем можно войти.
+            var demoPassword = Environment.GetEnvironmentVariable("DEMO_USER_PASSWORD");
+            if (string.IsNullOrWhiteSpace(demoPassword)) return;
+            if (!(await um.CreateAsync(user, demoPassword)).Succeeded) return;
         }
         // Держим ФИО актуальным (показывается в шапке как в ЛК РЭУ).
         if (user.FullName != fullName)

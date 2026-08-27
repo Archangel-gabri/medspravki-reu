@@ -6,7 +6,8 @@ namespace ReuMedCertificates.UnitTests;
 
 /// <summary>
 /// Тесты доменных правил авто-ревью — те «шаги человека», что не зависят от мощности модели.
-/// Кейсы взяты из реальных ошибок распознавания на живых справках (обезличено).
+/// Кейсы взяты из реальных ошибок распознавания на живых справках.
+/// Даты и фамилии обезличены: это медицинские данные студентов.
 /// </summary>
 public class RecognitionRulesTests
 {
@@ -20,19 +21,19 @@ public class RecognitionRulesTests
     public void StampOrSignaturePresent_works(bool? stamp, bool? esign, bool expected) =>
         RecognitionRules.StampOrSignaturePresent(stamp, esign).Should().Be(expected);
 
-    // ── Дата выдачи ≠ дата рождения (случай B: 07.01.2007 — это рождение) ──
+    // ── Дата выдачи ≠ дата рождения (случай B: распознанная дата оказалась рождением) ──
     [Fact]
     public void ResolveIssueDate_drops_birthdate_mistaken_as_issue()
     {
-        var birth = new DateOnly(2007, 1, 7);
-        var issueEqualsBirth = new DateOnly(2007, 1, 7);
+        var birth = new DateOnly(2006, 3, 2);
+        var issueEqualsBirth = new DateOnly(2006, 3, 2);
         RecognitionRules.ResolveIssueDate(issueEqualsBirth, birth).Should().BeNull();
     }
 
     [Fact]
     public void ResolveIssueDate_keeps_valid_issue_far_from_birth()
     {
-        var birth = new DateOnly(2007, 4, 14);          // случай C
+        var birth = new DateOnly(2006, 5, 21);          // случай C
         var issue = new DateOnly(2025, 11, 22);
         RecognitionRules.ResolveIssueDate(issue, birth).Should().Be(issue);
     }
