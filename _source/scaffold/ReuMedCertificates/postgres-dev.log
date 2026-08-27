@@ -1,0 +1,23 @@
+2026-04-29 22:38:08.772 MSK [76805] LOG:  starting PostgreSQL 14.21 (Homebrew) on aarch64-apple-darwin25.2.0, compiled by Apple clang version 17.0.0 (clang-1700.6.3.2), 64-bit
+2026-04-29 22:38:08.775 MSK [76805] LOG:  listening on IPv6 address "::1", port 5432
+2026-04-29 22:38:08.775 MSK [76805] LOG:  listening on IPv4 address "127.0.0.1", port 5432
+2026-04-29 22:38:08.776 MSK [76805] LOG:  listening on Unix socket "/tmp/.s.PGSQL.5432"
+2026-04-29 22:38:08.781 MSK [76806] LOG:  database system was interrupted; last known up at 2025-08-04 00:04:23 MSK
+2026-04-29 22:38:08.859 MSK [76806] LOG:  database system was not properly shut down; automatic recovery in progress
+2026-04-29 22:38:08.861 MSK [76806] LOG:  redo starts at 0/17716F8
+2026-04-29 22:38:08.861 MSK [76806] LOG:  invalid record length at 0/17717E0: wanted 24, got 0
+2026-04-29 22:38:08.861 MSK [76806] LOG:  redo done at 0/17717A8 system usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s
+2026-04-29 22:38:08.867 MSK [76805] LOG:  database system is ready to accept connections
+2026-04-29 22:47:25.266 MSK [77074] FATAL:  database "daniilnozdrakov" does not exist
+2026-04-29 23:46:39.367 MSK [78356] ERROR:  column "id" does not exist at character 8
+2026-04-29 23:46:39.367 MSK [78356] HINT:  Perhaps you meant to reference the column "students.Id".
+2026-04-29 23:46:39.367 MSK [78356] STATEMENT:  select id, "FullName" from students;
+2026-04-30 17:11:46.574 MSK [88725] FATAL:  role "postgres" does not exist
+2026-04-30 17:11:48.038 MSK [88741] FATAL:  role "postgres" does not exist
+2026-04-30 17:14:01.619 MSK [88926] ERROR:  column a.TeacherId does not exist at character 495
+2026-04-30 17:14:01.619 MSK [88926] STATEMENT:  SELECT a."Id", a."AccessFailedCount", a."ConcurrencyStamp", a."CreatedAt", a."Email", a."EmailConfirmed", a."FullName", a."IsActive", a."LastLoginAt", a."LockoutEnabled", a."LockoutEnd", a."NormalizedEmail", a."NormalizedUserName", a."PasswordHash", a."PhoneNumber", a."PhoneNumberConfirmed", a."SecurityStamp", a."TeacherId", a."TwoFactorEnabled", a."UserName", t."Id", t."CreatedAt", t."FullName", t."IsActive", t."ShortName", t."UpdatedAt"
+	FROM "AspNetUsers" AS a
+	LEFT JOIN teachers AS t ON a."TeacherId" = t."Id"
+	WHERE a."UserName" = $1
+	LIMIT 1
+2026-05-05 21:46:47.051 MSK [17441] FATAL:  role "postgres" does not exist

@@ -101,9 +101,9 @@
   ПРЯМО исключает загрузку студентами, сканы, OCR — разд. 5.2/31). Заказчик-студент (Даня) хочет
   АМБИЦИОЗНЫЙ v2: личный кабинет студента + загрузка фото + ИИ-распознавание + маршрутизация к
   физруку + влияние на оценки. Это раздел §33 ТЗ «развитие после MVP».
-- **Скаффолд `_source/scaffold/ReuMedCertificates/` НЕ компилируется** — Domain/Application пусты,
-  но `Program.cs`/`DI` уже заточены под student-portal/OCR (`AppUser`, `ApplicationDbContext`,
-  `IStudentPortalService`, `RegisterStudent`, `SeedIdentityAsync` — этих типов нет). Старт = с минуса.
+- **Ранний скаффолд удалён** (2026-08-27): он не компилировался (Domain/Application пусты при
+  том, что `Program.cs`/DI уже ссылались на несуществующие типы) и полностью дублировал пути
+  в `app/`. Рабочий код — только `app/`.
 - **Стек (утверждён ТЗ):** ASP.NET Core 8 + Razor Pages + HTMX + Bootstrap 5.3 + PostgreSQL 16
   (pg_trgm) + EF Core 8 + ASP.NET Identity + ClosedXML + Serilog. Clean Architecture. IIS / Windows / ЛВС РЭУ.
 - **Главный конфликт:** заказчик видит развёртывание ОФЛАЙН («сетевая папка / флешка на оборудование РЭУ»),
@@ -122,9 +122,8 @@
 ## Материалы
 
 - `_source/inputs/` — 2 ТЗ (md) + исходный docx заказчика.
-- `_source/mockups/` — фото desktop-«Расписания» (референс + реальные данные кафедры),
-  `wireframe-handdrawn.jpg` (рисованный master-detail), `IMG_4841.DNG` (оригинал).
-- `_source/scaffold/` — несобирающийся .NET-скелет.
+- `_source/mockups/` — фото интерфейса-референса и рукописный вайрфрейм master-detail
+  (`wireframe-01.jpg`). Описание — в `_source/README.md`.
 - `docs/PLAN.md` — большой план. `sessions/handoff/outgoing/think-20260614-202507.md` — ответ Codex.
 
 ## Реальные данные кафедры
