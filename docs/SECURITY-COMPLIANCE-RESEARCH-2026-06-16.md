@@ -741,7 +741,7 @@ PIPEDA не содержит обязательной локализации, н
 > Все команды готовы к запуску из корня кода. Базовые переменные (вставь в начало сессии):
 >
 > ```bash
-> export APP_ROOT="/home/danya/Рабочий стол/PROEB_NA_STARTE/projects/MedSpravki-REU"
+> export APP_ROOT="<корень-репозитория>"
 > export SRC="$APP_ROOT/app"            # содержит ReuMedCertificates.sln
 > export CODE="$APP_ROOT/app/src"       # 4 проекта Clean Architecture
 > export OUT="$APP_ROOT/_sec"           # папка под отчёты сканеров (не в git: добавь в .gitignore)
@@ -2068,12 +2068,12 @@ nginx/Битрикс-фронт проксирует префикс `/medspravki
 ---
 
 **Ключевые файлы-якоря для реализации** (абсолютные пути):
-- `/home/danya/Рабочий стол/PROEB_NA_STARTE/projects/MedSpravki-REU/app/src/ReuMedCertificates.Infrastructure/Identity/AppRole.cs` — добавить роли `Student`, `MedicalStaff`.
-- `/home/danya/Рабочий стол/PROEB_NA_STARTE/projects/MedSpravki-REU/app/src/ReuMedCertificates.Web/Program.cs` — политики, per-folder authorization, security-заголовки, `UseForwardedHeaders`, OIDC.
-- `/home/danya/Рабочий стол/PROEB_NA_STARTE/projects/MedSpravki-REU/app/src/ReuMedCertificates.Infrastructure/Services/ScanService.cs` — resource-check принадлежности + аудит просмотра в `OpenAsync`.
-- `/home/danya/Рабочий стол/PROEB_NA_STARTE/projects/MedSpravki-REU/app/src/ReuMedCertificates.Application/Registry/RegistryQueryService.cs` и `.../Students/StudentService.cs`, `.../Certificates`/`CertificateService.cs` — серверный scope-фильтр по группе/факультету.
-- `/home/danya/Рабочий стол/PROEB_NA_STARTE/projects/MedSpravki-REU/app/src/ReuMedCertificates.Domain/Entities/MedicalCertificate.cs` — расщепление на clearance/medical проекции.
-- `/home/danya/Рабочий стол/PROEB_NA_STARTE/projects/MedSpravki-REU/app/src/ReuMedCertificates.Application/Common/AuditEntryFactory.cs` — параметр `IpAddress`; `.../Infrastructure/Services/CurrentUser.cs` — роли/scope/`StudentId`.
+- `<корень-репозитория>/app/src/ReuMedCertificates.Infrastructure/Identity/AppRole.cs` — добавить роли `Student`, `MedicalStaff`.
+- `<корень-репозитория>/app/src/ReuMedCertificates.Web/Program.cs` — политики, per-folder authorization, security-заголовки, `UseForwardedHeaders`, OIDC.
+- `<корень-репозитория>/app/src/ReuMedCertificates.Infrastructure/Services/ScanService.cs` — resource-check принадлежности + аудит просмотра в `OpenAsync`.
+- `<корень-репозитория>/app/src/ReuMedCertificates.Application/Registry/RegistryQueryService.cs` и `.../Students/StudentService.cs`, `.../Certificates`/`CertificateService.cs` — серверный scope-фильтр по группе/факультету.
+- `<корень-репозитория>/app/src/ReuMedCertificates.Domain/Entities/MedicalCertificate.cs` — расщепление на clearance/medical проекции.
+- `<корень-репозитория>/app/src/ReuMedCertificates.Application/Common/AuditEntryFactory.cs` — параметр `IpAddress`; `.../Infrastructure/Services/CurrentUser.cs` — роли/scope/`StudentId`.
 
 
 ---
