@@ -7,7 +7,7 @@
 
 - Перед изменением scope читать раздел README «Два ТЗ», материалы `_source/inputs/` и [docs/PROJECT-STATUS.md](docs/PROJECT-STATUS.md).
 - Официальное ручное ТЗ и реализованные загрузка сканов/ИИ/личный кабинет — разные объёмы. Не выдавать реализованное за согласованное заказчиком.
-- Датированные сведения о деплое и данных — история, не текущая проверка. Старый `.proeb/context-pack.md` не заменяет живые исходники; ручной паспорт сейчас отсутствует.
+- Датированные сведения о деплое и данных — история, не текущая проверка. Старый `.proeb/context-pack.md` не заменяет живые исходники; канон метаданных — `.proeb/project.json`.
 - `app/Directory.Build.props` — .NET 8/C# 12; `app/global.json` — SDK policy.
 - `app/src/` — Domain, Application, Infrastructure, Web (ASP.NET Core/Razor Pages); `app/tests/ReuMedCertificates.UnitTests/` — доменные/application проверки.
 - PostgreSQL, файловые сканы и локальный Ollama — отдельные runtime-зависимости, не необходимые для unit-тестов.
