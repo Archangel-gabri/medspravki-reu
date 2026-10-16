@@ -65,3 +65,5 @@ Open `http://localhost:5080` and sign in as `teacher` with the password set in `
 ## License
 
 [MIT](LICENSE) © 2026 Vadim Kubrak.
+
+Contributions are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
