@@ -82,12 +82,11 @@ public static class DataSeeder
             await EnsureDemoUserAsync(userMgr, "admin", "Администратор системы", AppRoles.Admin);
 
             await SeedDemoDataAsync(db);
-            // Демо-студент-пользователь (ФИО как в ЛКС РЭУ — для совпадения ФИО на справке).
-            var demoStudent = await db.Students.FirstOrDefaultAsync(s => s.FullName == "Кубрак Вадим Андреевич")
-                ?? await db.Students.FirstOrDefaultAsync(s => s.FullName == "Иванов Иван Сергеевич");
+            // Демо-студент-пользователь связан только с явно синтетической записью.
+            var demoStudent = await db.Students.FirstOrDefaultAsync(s => s.FullName == "Алексеева Анна Тестовна");
             if (demoStudent is not null)
             {
-                await EnsureDemoUserAsync(userMgr, "student", "Кубрак Вадим Андреевич", AppRoles.Student);
+                await EnsureDemoUserAsync(userMgr, "student", "Алексеева Анна Тестовна", AppRoles.Student);
                 var su = await userMgr.FindByNameAsync("student");
                 if (su is not null && su.StudentId != demoStudent.Id)
                 {
@@ -156,8 +155,8 @@ public static class DataSeeder
 
         var pending = new (string Name, DraftSource Source, PhysicalEducationGroup Pg, HealthGroup Hg, string? Restr)[]
         {
-            ("Кузнецова Мария Павловна", DraftSource.Ocr,           PhysicalEducationGroup.Preparatory, HealthGroup.II,  "Освобождение от кроссовых дистанций"),
-            ("Морозов Артём Сергеевич",  DraftSource.StudentUpload, PhysicalEducationGroup.SpecialA,     HealthGroup.III, "Щадящий режим, без прыжков"),
+            ("Громов Глеб Тестович", DraftSource.Ocr,           PhysicalEducationGroup.Preparatory, HealthGroup.II,  "Освобождение от кроссовых дистанций"),
+            ("Ким Кирилл Тестович",   DraftSource.StudentUpload, PhysicalEducationGroup.SpecialA,     HealthGroup.III, "Щадящий режим, без прыжков"),
         };
 
         foreach (var p in pending)
@@ -229,30 +228,30 @@ public static class DataSeeder
         var law = await db.Departments.FirstAsync(d => d.Name.Contains("права"));
         var finance = await db.Departments.FirstAsync(d => d.Name.Contains("финансов"));
 
-        var petrova = await db.Teachers.FirstAsync(t => t.FullName.StartsWith("Петрова"));
-        var loginov = await db.Teachers.FirstAsync(t => t.FullName.StartsWith("Логинов"));
+        var lawTeacher = await db.Teachers.FirstAsync(t => t.FullName == "Преподаватель 57");
+        var financeTeacher = await db.Teachers.FirstAsync(t => t.FullName == "Преподаватель 40");
 
         // Реальные коды групп РЭУ (источник: rasp.rea.ru): право=15.30, финансы=15.25.
-        var groupLaw = new StudyGroup { Name = "15.30Д-Ю01/24б", Course = 2, DepartmentId = law.Id, TeacherId = petrova.Id, IsActive = true, CreatedAt = now, UpdatedAt = now };
-        var groupFin = new StudyGroup { Name = "15.25Д-ЭКФ01/24б", Course = 2, DepartmentId = finance.Id, TeacherId = loginov.Id, IsActive = true, CreatedAt = now, UpdatedAt = now };
+        var groupLaw = new StudyGroup { Name = "15.30Д-Ю01/24б", Course = 2, DepartmentId = law.Id, TeacherId = lawTeacher.Id, IsActive = true, CreatedAt = now, UpdatedAt = now };
+        var groupFin = new StudyGroup { Name = "15.25Д-ЭКФ01/24б", Course = 2, DepartmentId = finance.Id, TeacherId = financeTeacher.Id, IsActive = true, CreatedAt = now, UpdatedAt = now };
         db.StudyGroups.AddRange(groupLaw, groupFin);
 
         // (ФИО, группа, преподаватель, кафедра, справка?)
         var specs = new (string Name, StudyGroup Group, Teacher Teacher, Department Dept,
             (int StartOffset, int EndOffset, PhysicalEducationGroup Pg, HealthGroup Hg, string? Restr)? Cert)[]
         {
-            ("Иванов Иван Сергеевич",       groupLaw, petrova, law,     (-30, 90, PhysicalEducationGroup.Basic,       HealthGroup.I,   null)),
-            ("Иванова Алина Романовна",     groupLaw, petrova, law,     (-60,  5, PhysicalEducationGroup.Preparatory, HealthGroup.II,  "Освобождение от силовых упражнений")),
-            ("Сидоров Дмитрий Николаевич",  groupLaw, petrova, law,     (-90,-10, PhysicalEducationGroup.Basic,       HealthGroup.I,   null)),
-            ("Кузнецова Мария Павловна",    groupLaw, petrova, law,      null),
-            ("Смирнов Олег Викторович",     groupLaw, petrova, law,     (  5, 200, PhysicalEducationGroup.Basic,       HealthGroup.I,   null)),
-            ("Фёдорова Анна Дмитриевна",    groupLaw, petrova, law,     (-15, 350, PhysicalEducationGroup.Exempt,      HealthGroup.IV,  "Полное освобождение")),
-            ("Петров Никита Андреевич",     groupFin, loginov, finance, (-20, 120, PhysicalEducationGroup.Basic,       HealthGroup.I,   null)),
-            ("Васильева Екатерина Игоревна",groupFin, loginov, finance, (-40,  3, PhysicalEducationGroup.SpecialA,    HealthGroup.III, "Щадящий режим, без прыжков")),
-            ("Морозов Артём Сергеевич",     groupFin, loginov, finance,  null),
-            ("Новикова Ольга Алексеевна",   groupFin, loginov, finance, (-70,-25, PhysicalEducationGroup.Preparatory, HealthGroup.II,  "Освобождение от бега")),
-            ("Алексеев Павел Романович",    groupFin, loginov, finance, (-10, 360, PhysicalEducationGroup.Basic,       HealthGroup.I,   null)),
-            ("Зайцева Дарья Максимовна",    groupFin, loginov, finance, (-50,  20, PhysicalEducationGroup.SpecialB,    HealthGroup.III, "Только ЛФК")),
+            ("Алексеева Анна Тестовна",     groupLaw, lawTeacher, law,     (-30, 90, PhysicalEducationGroup.Basic,       HealthGroup.I,   null)),
+            ("Белов Борис Тестович",       groupLaw, lawTeacher, law,     (-60,  5, PhysicalEducationGroup.Preparatory, HealthGroup.II,  "Освобождение от силовых упражнений")),
+            ("Волкова Вера Тестовна",       groupLaw, lawTeacher, law,     (-90,-10, PhysicalEducationGroup.Basic,       HealthGroup.I,   null)),
+            ("Громов Глеб Тестович",       groupLaw, lawTeacher, law,      null),
+            ("Давыдова Дина Тестовна",     groupLaw, lawTeacher, law,     (  5, 200, PhysicalEducationGroup.Basic,       HealthGroup.I,   null)),
+            ("Елов Егор Тестович",         groupLaw, lawTeacher, law,     (-15, 350, PhysicalEducationGroup.Exempt,      HealthGroup.IV,  "Полное освобождение")),
+            ("Жукова Жанна Тестовна",     groupFin, financeTeacher, finance, (-20, 120, PhysicalEducationGroup.Basic,       HealthGroup.I,   null)),
+            ("Зорин Захар Тестович",      groupFin, financeTeacher, finance, (-40,  3, PhysicalEducationGroup.SpecialA,    HealthGroup.III, "Щадящий режим, без прыжков")),
+            ("Ким Кирилл Тестович",        groupFin, financeTeacher, finance,  null),
+            ("Лебедева Лидия Тестовна",   groupFin, financeTeacher, finance, (-70,-25, PhysicalEducationGroup.Preparatory, HealthGroup.II,  "Освобождение от бега")),
+            ("Миронов Марк Тестович",      groupFin, financeTeacher, finance, (-10, 360, PhysicalEducationGroup.Basic,       HealthGroup.I,   null)),
+            ("Орлова Ольга Тестовна",      groupFin, financeTeacher, finance, (-50,  20, PhysicalEducationGroup.SpecialB,    HealthGroup.III, "Только ЛФК")),
         };
 
         foreach (var s in specs)
@@ -281,7 +280,7 @@ public static class DataSeeder
                     StartDate = today.AddDays(c.StartOffset),
                     EndDate = today.AddDays(c.EndOffset),
                     CertificateNumber = "086/у-" + Random.Shared.Next(1000, 9999),
-                    MedicalOrganization = "Городская поликлиника №5, г. Москва",
+                    MedicalOrganization = "Демонстрационная поликлиника",
                     HealthGroup = c.Hg,
                     PhysicalGroup = c.Pg,
                     Restrictions = c.Restr,
