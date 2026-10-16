@@ -2,7 +2,7 @@
 
 **[Русская версия →](README.ru.md)**
 
-A student-built web registry based on a real brief from the Plekhanov Russian University of Economics physical education department to review medical certificates and class eligibility.
+A student-built web registry based on a real brief from the Plekhanov Russian University of Economics physical education department to review medical certificates and class eligibility. The project is complete and has been handed over to the department.
 
 ![Medical certificate registry populated with synthetic demo students](assets/readme/registry.png)
 
